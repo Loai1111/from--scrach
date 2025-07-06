@@ -40,18 +40,54 @@ function broadcastUpdate() {
     });
 }
 
+// --- Automated System Logic ---
+
+async function processNewRequest(requestId, bloodType) {
+    const connection = await mysql.createConnection(dbConfig);
+    try {
+        // Check inventory for a matching blood bag
+        const [bags] = await connection.execute('SELECT * FROM BloodBags WHERE BloodType = ? LIMIT 1', [bloodType]);
+        
+        let newStatus;
+        if (bags.length > 0) {
+            // Bag found, move to cross-matching
+            newStatus = 'PENDING_CROSSMATCH';
+        } else {
+            // No bag found, escalate to find donors
+            newStatus = 'ESCALATED_TO_DONORS';
+        }
+
+        // Update the request status
+        await connection.execute('UPDATE BloodRequests SET Status = ? WHERE RequestID = ?', [newStatus, requestId]);
+        console.log(`Request ${requestId} status automatically updated to ${newStatus}`);
+
+    } catch (error) {
+        console.error(`Failed to process request ${requestId}:`, error);
+    } finally {
+        await connection.end();
+        // Notify clients of the change
+        broadcastUpdate();
+    }
+}
+
+
 // --- API Endpoints ---
 
-// GET /requests
+// GET /requests (now includes item details)
 app.get('/requests', async (req, res) => {
-    const { status } = req.query;
-    let query = 'SELECT * FROM BloodRequests ORDER BY CreatedAt DESC';
-    if (status) {
-        query = 'SELECT * FROM BloodRequests WHERE Status = ? ORDER BY CreatedAt DESC';
-    }
     try {
         const connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute(query, status ? [status] : []);
+        const query = `
+            SELECT 
+                r.RequestID, r.PatientID, r.PatientBloodType, r.Urgency, r.Status, r.CreatedAt,
+                GROUP_CONCAT(i.ComponentType) as Components,
+                i.SpecialRequirements
+            FROM BloodRequests r
+            JOIN BloodRequestItems i ON r.RequestID = i.RequestID
+            GROUP BY r.RequestID
+            ORDER BY r.CreatedAt DESC
+        `;
+        const [rows] = await connection.execute(query);
         await connection.end();
         res.status(200).json(rows);
     } catch (error) {
@@ -60,12 +96,11 @@ app.get('/requests', async (req, res) => {
     }
 });
 
-// GET /requests/:id - NEW ENDPOINT
+// GET /requests/:id
 app.get('/requests/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const connection = await mysql.createConnection(dbConfig);
-        // We could join with BloodRequestItems here for a more complete response
         const [rows] = await connection.execute('SELECT * FROM BloodRequests WHERE RequestID = ?', [id]);
         await connection.end();
         if (rows.length === 0) {
@@ -98,33 +133,15 @@ app.post('/requests', async (req, res) => {
 
         await connection.commit();
         await connection.end();
+        
         res.status(201).json({ message: 'Request created successfully', requestId: newRequestId });
-        broadcastUpdate();
+        
+        // Trigger automated processing and notify clients
+        broadcastUpdate(); 
+        processNewRequest(newRequestId, patientBloodType);
+
     } catch (error) {
         if (connection) await connection.rollback();
-        console.error('Database Error:', error);
-        res.status(500).json({ message: 'Internal Server Error', error: error.message });
-    }
-});
-
-// PUT /requests/:id/status
-app.put('/requests/:id/status', async (req, res) => {
-    const { id } = req.params;
-    const { status, notes } = req.body;
-    if (!status) {
-        return res.status(400).json({ message: 'Status is required.' });
-    }
-    try {
-        const connection = await mysql.createConnection(dbConfig);
-        const query = 'UPDATE BloodRequests SET Status = ?, Notes = ? WHERE RequestID = ?';
-        const [result] = await connection.execute(query, [status, notes, id]);
-        await connection.end();
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: `Request with ID ${id} not found.` });
-        }
-        res.status(200).json({ message: `Request ${id} status updated to ${status}` });
-        broadcastUpdate();
-    } catch (error) {
         console.error('Database Error:', error);
         res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
@@ -155,7 +172,7 @@ app.post('/inventory', async (req, res) => {
         await connection.execute(query, [bloodType, expiryDate]);
         await connection.end();
         res.status(201).json({ message: 'Blood bag added successfully.' });
-        broadcastUpdate(); // Notify clients that inventory has changed
+        broadcastUpdate();
     } catch (error) {
         console.error('Database Error:', error);
         res.status(500).json({ message: 'Internal Server Error', error: error.message });

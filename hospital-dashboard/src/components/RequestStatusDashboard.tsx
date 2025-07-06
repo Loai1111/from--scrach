@@ -1,15 +1,14 @@
-// This component displays a real-time dashboard of blood requests for a hospital.
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom'; // Import Link
 import axios from 'axios';
 import './RequestStatusDashboard.css';
 
 interface Request {
     RequestID: number;
-    PatientID: string; // Changed from PatientName
+    PatientID: string;
     Urgency: 'Emergency' | 'Urgent' | 'Scheduled';
     Status: string;
     CreatedAt: string;
+    SpecialRequirements: string | null; // Now a JSON string
 }
 
 const API_URL = 'http://localhost:3001';
@@ -66,15 +65,14 @@ const RequestStatusDashboard = () => {
                             <th>Patient ID</th>
                             <th>Urgency</th>
                             <th>Status</th>
+                            <th>Special Requirements</th>
                             <th>Date</th>
                         </tr>
                     </thead>
                     <tbody>
                         {requests.map((req) => (
                             <tr key={req.RequestID}>
-                                <td>
-                                    <Link to={`/requests/${req.RequestID}`}>{req.RequestID}</Link>
-                                </td>
+                                <td>{req.RequestID}</td>
                                 <td>{req.PatientID}</td>
                                 <td>
                                     <span className={`urgency-tag ${req.Urgency.toLowerCase()}`}>
@@ -85,6 +83,9 @@ const RequestStatusDashboard = () => {
                                     <span className={`status-tag status-${req.Status.toLowerCase()}`}>
                                         {req.Status.replace(/_/g, ' ')}
                                     </span>
+                                </td>
+                                <td>
+                                    {req.SpecialRequirements && JSON.parse(req.SpecialRequirements).join(', ')}
                                 </td>
                                 <td>{new Date(req.CreatedAt).toLocaleString()}</td>
                             </tr>
