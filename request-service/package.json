@@ -1,0 +1,26 @@
+{
+  "name": "request-service",
+  "version": "1.0.0",
+  "description": "Backend service to manage blood requests for the Lifeline project.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [
+    "lifeline",
+    "blood-request",
+    "api"
+  ],
+  "author": "Roo",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "mysql2": "^3.10.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.3"
+  }
+}

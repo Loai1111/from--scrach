@@ -1,0 +1,67 @@
+.dashboard-container {
+    width: 100%;
+}
+
+.refresh-btn {
+    background-color: #1e88e5;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    margin-bottom: 15px;
+    display: block;
+    margin-left: auto;
+}
+
+.requests-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.requests-table th, .requests-table td {
+    border-bottom: 1px solid #ddd;
+    padding: 12px 8px;
+    text-align: left;
+}
+
+.requests-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+    color: #333;
+}
+
+.requests-table tbody tr:hover {
+    background-color: #f9f9f9;
+}
+
+.urgency-tag, .status-tag {
+    padding: 4px 8px;
+    border-radius: 12px;
+    color: white;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    display: inline-block;
+}
+
+.urgency-tag.emergency { background-color: #c62828; } /* Dark Red */
+.urgency-tag.urgent { background-color: #f57c00; } /* Orange */
+.urgency-tag.scheduled { background-color: #388e3c; } /* Green */
+
+.status-tag {
+    color: #333;
+    background-color: #e0e0e0; /* Default Grey */
+}
+
+.status-tag.status-pending_review { background-color: #ffeb3b; } /* Yellow */
+.status-tag.status-allocated { background-color: #81d4fa; } /* Light Blue */
+.status-tag.status-issued { background-color: #4fc3f7; } /* Blue */
+.status-tag.status-fulfilled { background-color: #a5d6a7; } /* Light Green */
+.status-tag.status-cancelled_by_hospital,
+.status-tag.status-rejected_by_bloodbank {
+    background-color: #ef9a9a; /* Light Red */
+    text-decoration: line-through;
+}
