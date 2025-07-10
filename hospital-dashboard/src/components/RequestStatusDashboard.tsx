@@ -4,15 +4,31 @@ import './RequestStatusDashboard.css';
 
 interface Request {
     RequestID: number;
-    PatientID: string;
+    PatientName: string;
+    PatientBloodType: string;
     Urgency: 'Emergency' | 'Urgent' | 'Scheduled';
     Status: string;
     CreatedAt: string;
-    SpecialRequirements: string | null; // Now a JSON string
+    RequiredAt: string;
+    SpecialRequirements: string | null;
+    CrossmatchReport: string | null;
+    Quantity: number;
 }
 
-const API_URL = 'http://localhost:3001';
-const WS_URL = 'ws://localhost:3001';
+const API_URL = 'http://localhost:3003';
+const WS_URL = 'ws://localhost:3003';
+
+const formatDate = (dateString: string) => {
+    if (!dateString) return '_';
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
 
 const RequestStatusDashboard = () => {
     const [requests, setRequests] = useState<Request[]>([]);
@@ -29,6 +45,16 @@ const RequestStatusDashboard = () => {
             console.error(err);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleCancelRequest = async (requestId: number) => {
+        try {
+            await axios.put(`${API_URL}/requests/${requestId}/cancel`);
+            fetchRequests(); // Refresh the list
+        } catch (err) {
+            setError('Failed to cancel request.');
+            console.error(err);
         }
     };
 
@@ -62,32 +88,48 @@ const RequestStatusDashboard = () => {
                     <thead>
                         <tr>
                             <th>Request ID</th>
-                            <th>Patient ID</th>
+                            <th>Patient Name</th>
+                            <th>Blood Type</th>
                             <th>Urgency</th>
+                            <th>Quantity</th>
                             <th>Status</th>
                             <th>Special Requirements</th>
-                            <th>Date</th>
+                            <th>Crossmatch Report</th>
+                            <th>Request Date</th>
+                            <th>Required Date</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {requests.map((req) => (
                             <tr key={req.RequestID}>
                                 <td>{req.RequestID}</td>
-                                <td>{req.PatientID}</td>
+                                <td>{req.PatientName}</td>
+                                <td>{req.PatientBloodType}</td>
                                 <td>
                                     <span className={`urgency-tag ${req.Urgency.toLowerCase()}`}>
                                         {req.Urgency}
                                     </span>
                                 </td>
+                                <td>{req.Quantity}</td>
                                 <td>
                                     <span className={`status-tag status-${req.Status.toLowerCase()}`}>
                                         {req.Status.replace(/_/g, ' ')}
                                     </span>
                                 </td>
                                 <td>
-                                    {req.SpecialRequirements && JSON.parse(req.SpecialRequirements).join(', ')}
+                                    {req.SpecialRequirements ? JSON.parse(req.SpecialRequirements).join(', ') : '_'}
                                 </td>
-                                <td>{new Date(req.CreatedAt).toLocaleString()}</td>
+                                <td>{req.CrossmatchReport || '_'}</td>
+                                <td>{formatDate(req.CreatedAt)}</td>
+                                <td>{formatDate(req.RequiredAt)}</td>
+                                <td>
+                                    {req.Status === 'PENDING_REVIEW' && (
+                                        <button onClick={() => handleCancelRequest(req.RequestID)} className="cancel-btn">
+                                            Cancel
+                                        </button>
+                                    )}
+                                </td>
                             </tr>
                         ))}
                     </tbody>

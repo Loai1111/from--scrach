@@ -271,3 +271,14 @@ ISSUED	Staff dispatches the allocated bag.
 FULFILLED /	Hospital user confirms receiving blood bag(s) , by clicking received on their interface.
 CANCELLED_BY_HOSPITAL	Hospital staff manually cancels.
 REJECTED_BY_BLOODBANK	Blood bank staff manually rejects for exceptional reason.
+_________________________________________
+Recipient's Blood Type	Can Receive RBCs From These Types
+O-	O- only
+O+	O+, O-
+A-	A-, O-
+A+	A+, A-, O+, O-
+B-	B-, O-
+B+	B+, B-, O+, O-
+AB-	AB-, A-, B-, O-
+AB+ (Universal)	All types (AB+, AB-, A+, A-, B+, B-, O+, O-)
+

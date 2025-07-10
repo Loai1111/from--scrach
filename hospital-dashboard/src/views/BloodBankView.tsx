@@ -1,15 +1,23 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
-import IncomingRequestList from '../components/IncomingRequestList.tsx';
-import InventoryManagement from '../components/InventoryManagement.tsx';
+import { Routes, Route, Link } from 'react-router-dom';
+import IncomingRequestListView from './IncomingRequestListView';
+import InventoryView from './InventoryView';
+import ExpiredBagsView from './ExpiredBagsView';
+import './BloodBankView.css';
 
 const BloodBankView = () => {
-  return (
-    <Routes>
-      <Route path="/" element={<IncomingRequestList />} />
-      <Route path="/inventory" element={<InventoryManagement />} />
-    </Routes>
-  );
+    return (
+        <div>
+            <div className="blood-bank-content">
+                <Routes>
+                    <Route index element={<IncomingRequestListView />} />
+                    <Route path="requests" element={<IncomingRequestListView />} />
+                    <Route path="inventory" element={<InventoryView />} />
+                    <Route path="expired" element={<ExpiredBagsView />} />
+                </Routes>
+            </div>
+        </div>
+    );
 };
 
 export default BloodBankView;
