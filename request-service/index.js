@@ -52,6 +52,10 @@ function broadcastUpdate() {
     io.emit('inventory_updated');
     console.log("Broadcasted 'inventory_updated' event to all clients.");
 }
+function broadcastNotificationUpdate() {
+    io.emit('notification_updated');
+    console.log("Broadcasted 'notification_updated' event to all clients.");
+}
 
 async function updateRequestStatus(requestId, newStatus) {
     const connection = await mysql.createConnection(dbConfig);
@@ -88,7 +92,7 @@ async function cancelRequest(requestId) {
         }
         const currentStatus = requests[0].Status;
         // Define statuses that cannot be cancelled from the hospital side
-        const nonCancellableStatuses = ['ISSUED', 'FULFILLED', 'CANCELLED_BY_HOSPITAL', 'REJECTED_BY_BLOODBANK'];
+        const nonCancellableStatuses = ['FULFILLED', 'CANCELLED_BY_HOSPITAL', 'REJECTED_BY_BLOODBANK'];
         if (nonCancellableStatuses.includes(currentStatus)) {
             await connection.rollback();
             return { success: false, message: `Request cannot be cancelled because its status is '${currentStatus}'.` };
@@ -126,33 +130,70 @@ async function cancelRequest(requestId) {
 // --- Automated System Logic ---
 
 async function updateExpiredBags() {
-    const connection = await mysql.createConnection(dbConfig);
+    let connection;
     try {
-        const [result] = await connection.execute(
-            "UPDATE BloodBags SET Status = 'Expired' WHERE ExpiryDate < NOW() AND Status = 'Available'"
-        );
-        if (result.affectedRows > 0) {
-            console.log(`${result.affectedRows} bag(s) marked as expired.`);
-            broadcastUpdate();
-        }
+        connection = await mysql.createConnection(dbConfig);
+        await connection.beginTransaction();
 
-        const [expiredBags] = await connection.execute(
-            "SELECT BagID FROM BloodBags WHERE Status = 'Expired' AND Disposed = FALSE"
+        // Step 1: Find available bags that have just expired
+        const [bagsToExpire] = await connection.execute(
+            "SELECT BagID FROM BloodBags WHERE ExpiryDate < NOW() AND Status = 'Available'"
         );
 
-        if (expiredBags.length > 0) {
-            const insertNotificationQuery = 'INSERT INTO notifications (RecipientRole, Message) VALUES ?';
-            const notificationValues = expiredBags.map(bag => ['BloodBank', `Bag ${bag.BagID} has expired and requires disposal.`]);
-            
-            if (notificationValues.length > 0) {
-                await connection.query(insertNotificationQuery, [notificationValues]);
-                console.log(`Created ${notificationValues.length} new disposal notifications.`);
+        let inventoryUpdated = false;
+        if (bagsToExpire.length > 0) {
+            const bagIdsToExpire = bagsToExpire.map(bag => bag.BagID);
+            const placeholders = bagIdsToExpire.map(() => '?').join(',');
+
+            // Step 2: Update their status to 'Expired'
+            const [updateResult] = await connection.execute(
+                `UPDATE BloodBags SET Status = 'Expired' WHERE BagID IN (${placeholders})`,
+                bagIdsToExpire
+            );
+
+            if (updateResult.affectedRows > 0) {
+                console.log(`${updateResult.affectedRows} bag(s) marked as expired.`);
+                inventoryUpdated = true;
             }
         }
+
+        // Step 3: Find all expired bags that DON'T have a notification yet
+        const [expiredBagsWithoutNotif] = await connection.execute(`
+            SELECT b.BagID FROM BloodBags b
+            LEFT JOIN notifications n ON b.BagID = n.ReferenceID AND n.NotificationType = 'BAG_EXPIRED'
+            WHERE b.Status = 'Expired' AND n.NotificationID IS NULL
+        `);
+
+        let notificationsCreated = false;
+        if (expiredBagsWithoutNotif.length > 0) {
+            const bagIdsToNotify = expiredBagsWithoutNotif.map(bag => bag.BagID);
+            
+            const notificationValues = bagIdsToNotify.map(bagId =>
+                ['BloodBank', `Bag ${bagId} has expired and requires disposal.`, 'BAG_EXPIRED', bagId]
+            );
+
+            const insertNotificationQuery = 'INSERT INTO notifications (RecipientRole, Message, NotificationType, ReferenceID) VALUES ?';
+            await connection.query(insertNotificationQuery, [notificationValues]);
+            
+            console.log(`Created ${notificationValues.length} new notifications for expired bags.`);
+            notificationsCreated = true;
+        }
+
+        await connection.commit();
+
+        // Step 4: Broadcast updates if anything changed
+        if (inventoryUpdated) {
+            broadcastUpdate();
+        }
+        if (notificationsCreated) {
+            broadcastNotificationUpdate();
+        }
+
     } catch (error) {
+        if (connection) await connection.rollback();
         console.error('Failed to update expired bags:', error);
     } finally {
-        await connection.end();
+        if (connection) await connection.end();
     }
 }
 
@@ -431,35 +472,6 @@ app.post('/requests/:id/allocate', async (req, res) => {
     }
 });
 
-app.post('/requests/:id/dispatch', async (req, res) => {
-    const { id: requestId } = req.params;
-    const connection = await mysql.createConnection(dbConfig);
-    try {
-        await connection.beginTransaction();
-
-        // 1. Update the request status to IN_TRANSIT
-        await connection.execute(
-            'UPDATE BloodRequests SET Status = "ISSUED" WHERE RequestID = ?',
-            [requestId]
-        );
-
-        // 2. Update the status of all bags associated with this request to Dispatched
-        await connection.execute(
-            `UPDATE BloodBags SET Status = 'Dispatched' WHERE BagID IN (SELECT BagID FROM requestbags WHERE RequestID = ?)`,
-            [requestId]
-        );
-
-        await connection.commit();
-        broadcastUpdate();
-        res.status(200).json({ message: 'Request dispatched successfully.' });
-    } catch (error) {
-        await connection.rollback();
-        console.error(`Failed to dispatch request ${requestId}:`, error);
-        res.status(500).json({ message: 'Internal Server Error' });
-    } finally {
-        await connection.end();
-    }
-});
 
 app.post('/requests/:id/deliver', async (req, res) => {
     const { id: requestId } = req.params;
@@ -533,6 +545,18 @@ app.post('/requests/:id/reject', async (req, res) => {
     }
 });
 
+app.get('/notifications', async (req, res) => {
+    try {
+        const connection = await mysql.createConnection(dbConfig);
+        const [rows] = await connection.execute('SELECT * FROM notifications ORDER BY CreatedAt DESC');
+        await connection.end();
+        res.status(200).json(rows);
+    } catch (error) {
+        console.error('Database Error:', error);
+        res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
+});
+
 app.get('/notifications/:role', async (req, res) => {
     const { role } = req.params;
     if (!['hospital', 'bloodBank'].includes(role)) {
@@ -585,7 +609,7 @@ app.get('/donors', async (req, res) => {
 app.get('/inventory', async (req, res) => {
     try {
         const connection = await mysql.createConnection(dbConfig);
-        const [rows] = await connection.execute("SELECT b.BagID, b.DonorID, d.DonorName, b.BloodType, b.CollectionDate, b.ExpiryDate, b.Status FROM BloodBags b LEFT JOIN Donors d ON b.DonorID = d.DonorID WHERE b.Status = 'Available' ORDER BY b.ExpiryDate ASC");
+        const [rows] = await connection.execute("SELECT b.BagID, b.DonorID, d.DonorName, b.BloodType, b.CollectionDate, b.ExpiryDate, b.Status as status FROM BloodBags b LEFT JOIN Donors d ON b.DonorID = d.DonorID ORDER BY b.ExpiryDate ASC");
         await connection.end();
         res.status(200).json(rows);
     } catch (error) {
@@ -624,7 +648,7 @@ app.get('/inventory/stats', async (req, res) => {
 });
 
 app.post('/inventory', async (req, res) => {
-    const { donorId, expiryDate, quantity = 1 } = req.body;
+    const { donorId, expiryDate, quantity = 1, status = 'Available' } = req.body;
     if (!donorId || !expiryDate) {
         return res.status(400).json({ message: 'Valid donor and expiry date are required.' });
     }
@@ -644,17 +668,19 @@ app.post('/inventory', async (req, res) => {
         }
         const bloodType = donorRows[0].BloodType;
 
-        const insertQuery = "INSERT INTO BloodBags (DonorID, BloodType, CollectionDate, ExpiryDate, Status) VALUES (?, ?, NOW(), ?, 'Available')";
+        const insertQuery = "INSERT INTO BloodBags (DonorID, BloodType, CollectionDate, ExpiryDate, Status) VALUES (?, ?, NOW(), ?, ?)";
         
         for (let i = 0; i < quantity; i++) {
-            await connection.execute(insertQuery, [donorId, bloodType, expiryDate]);
+            await connection.execute(insertQuery, [donorId, bloodType, expiryDate, status]);
         }
 
         await connection.commit();
         
-        res.status(201).json({ message: `${quantity} blood bag(s) added successfully.` });
+        res.status(201).json({ message: `${quantity} blood bag(s) added successfully with status '${status}'.` });
 
-        checkEscalatedRequests(bloodType);
+        if (status === 'Available') {
+            checkEscalatedRequests(bloodType);
+        }
         broadcastUpdate();
 
     } catch (error) {

@@ -46,7 +46,7 @@ const RequestDetails = () => {
     const handleCancelRequest = async () => {
         if (!id || !request) return;
 
-        const nonCancellableStatuses = ['ISSUED', 'FULFILLED', 'CANCELLED_BY_HOSPITAL', 'REJECTED_BY_BLOODBANK'];
+        const nonCancellableStatuses = ['FULFILLED', 'CANCELLED_BY_HOSPITAL', 'REJECTED_BY_BLOODBANK'];
         if (nonCancellableStatuses.includes(request.Status)) {
             setCancellationError(`This request cannot be cancelled as its status is '${request.Status}'.`);
             return;
@@ -88,7 +88,7 @@ const RequestDetails = () => {
     if (error) return <div className="alert error">{error}</div>;
     if (!request) return <div>Loading request details...</div>;
 
-    const canBeCancelled = !['ISSUED', 'FULFILLED', 'CANCELLED_BY_HOSPITAL', 'REJECTED_BY_BLOODBANK'].includes(request.Status);
+    const canBeCancelled = !['FULFILLED', 'CANCELLED_BY_HOSPITAL', 'REJECTED_BY_BLOODBANK'].includes(request.Status);
 
     return (
         <div className="details-container">
@@ -124,14 +124,6 @@ const RequestDetails = () => {
                     </button>
                 )}
 
-                {request.Status === 'ISSUED' && (
-                    <button
-                        onClick={handleDeliverRequest}
-                        className="button primary"
-                    >
-                        Confirm Receipt
-                    </button>
-                )}
             </div>
         </div>
     );

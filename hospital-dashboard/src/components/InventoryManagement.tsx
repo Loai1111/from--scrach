@@ -3,6 +3,7 @@ import axios from 'axios';
 import Select from 'react-select';
 import UpdateBagForm from './UpdateBagForm';
 import { SocketContext } from '../App';
+import './InventoryManagement.css';
 
 const API_URL = 'http://localhost:3003';
 
@@ -13,6 +14,7 @@ interface BloodBag {
     BloodType: string;
     CollectionDate: string;
     ExpiryDate: string;
+    Status: string;
 }
 
 interface Donor {
@@ -24,6 +26,7 @@ interface Donor {
 
 const InventoryManagement = () => {
     const [inventory, setInventory] = useState<BloodBag[]>([]);
+    const [sortConfig, setSortConfig] = useState<{ key: keyof BloodBag; direction: string } | null>(null);
     const [donors, setDonors] = useState<Donor[]>([]);
     const [selectedDonor, setSelectedDonor] = useState<Donor | null>(null);
     const [quantity, setQuantity] = useState(1);
@@ -130,9 +133,46 @@ const InventoryManagement = () => {
         setUpdatingBag(bag);
     };
 
+    const handleDisposeBag = async (bagId: number) => {
+        if (window.confirm('Are you sure you want to mark this bag as disposed?')) {
+            try {
+                await axios.put(`${API_URL}/bags/${bagId}/dispose`);
+                fetchInventory(); // Refresh the list
+            } catch (err: any) {
+                const errorMessage = err.response?.data?.message || 'Failed to dispose blood bag.';
+                setError(errorMessage);
+                console.error(err);
+            }
+        }
+    };
+
     const handleCloseUpdateForm = () => {
         setUpdatingBag(null);
         fetchInventory(); // Refresh the list
+    };
+
+    const sortedInventory = React.useMemo(() => {
+        let sortableItems = [...inventory];
+        if (sortConfig !== null) {
+            sortableItems.sort((a, b) => {
+                if (a[sortConfig.key] < b[sortConfig.key]) {
+                    return sortConfig.direction === 'ascending' ? -1 : 1;
+                }
+                if (a[sortConfig.key] > b[sortConfig.key]) {
+                    return sortConfig.direction === 'ascending' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return sortableItems;
+    }, [inventory, sortConfig]);
+
+    const requestSort = (key: keyof BloodBag) => {
+        let direction = 'ascending';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
     };
 
     return (
@@ -191,22 +231,24 @@ const InventoryManagement = () => {
                 <table className="requests-table">
                     <thead>
                         <tr>
-                            <th>Bag ID</th>
-                            <th>Donor Name</th>
-                            <th>Blood Type</th>
-                            <th>Collection Date</th>
-                            <th>Expiry Date</th>
+                            <th onClick={() => requestSort('BagID')}>Bag ID</th>
+                            <th onClick={() => requestSort('DonorName')}>Donor Name</th>
+                            <th onClick={() => requestSort('BloodType')}>Blood Type</th>
+                            <th onClick={() => requestSort('CollectionDate')}>Collection Date</th>
+                            <th onClick={() => requestSort('ExpiryDate')}>Expiry Date</th>
+                            <th onClick={() => requestSort('Status')}>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {inventory.map((bag) => (
+                        {sortedInventory.map((bag) => (
                             <tr key={bag.BagID}>
                                 <td>{bag.BagID}</td>
                                 <td>{bag.DonorName || '_'}</td>
                                 <td>{bag.BloodType || 'N/A'}</td>
                                 <td>{new Date(bag.CollectionDate).toLocaleDateString()}</td>
                                 <td>{new Date(bag.ExpiryDate).toLocaleDateString()}</td>
+                                <td className={`status-${bag.Status.toLowerCase()}`}>{bag.Status}</td>
                                 <td>
                                     <button onClick={() => handleUpdateClick(bag)} className="update-btn">
                                         Update
@@ -214,6 +256,11 @@ const InventoryManagement = () => {
                                     <button onClick={() => handleDeleteBag(bag.BagID)} className="delete-btn">
                                         Delete
                                     </button>
+                                    {bag.Status === 'Expired' && (
+                                        <button onClick={() => handleDisposeBag(bag.BagID)} className="dispose-btn">
+                                            Dispose
+                                        </button>
+                                    )}
                                 </td>
                             </tr>
                         ))}

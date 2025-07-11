@@ -13,11 +13,7 @@ interface Notification {
     BagID?: number;
 }
 
-interface NotificationBellProps {
-    role: 'hospital' | 'bloodBank';
-}
-
-const NotificationBell: React.FC<NotificationBellProps> = ({ role }) => {
+const NotificationBell: React.FC = () => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [confirmingId, setConfirmingId] = useState<number | null>(null);
@@ -35,7 +31,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ role }) => {
 
     const fetchNotifications = async () => {
         try {
-            const response = await axios.get<Notification[]>(`${API_URL}/notifications/${role}`);
+            const response = await axios.get<Notification[]>(`${API_URL}/notifications`);
             setNotifications(sortNotifications(response.data));
         } catch (err) {
             setError('Failed to fetch notifications.');
@@ -55,7 +51,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ role }) => {
                 socket.off('new_notification', fetchNotifications);
             }
         };
-    }, [role, socket]);
+    }, [socket]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

@@ -25,6 +25,7 @@ const IncomingRequestList: React.FC<IncomingRequestListProps> = ({ viewMode }) =
     const [requests, setRequests] = useState<Request[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [managingRequestId, setManagingRequestId] = useState<number | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: keyof Request; direction: string } | null>(null);
 
     const fetchAllRequests = async () => {
         try {
@@ -74,6 +75,36 @@ const IncomingRequestList: React.FC<IncomingRequestListProps> = ({ viewMode }) =
 
     const cancellableStatuses = ['PENDING_CROSSMATCH', 'ESCALATED_TO_DONORS'];
 
+    const sortedRequests = React.useMemo(() => {
+        let sortableItems = [...requests];
+        if (sortConfig !== null) {
+            sortableItems.sort((a, b) => {
+                const aValue = a[sortConfig.key];
+                const bValue = b[sortConfig.key];
+
+                if (aValue === null) return -1;
+                if (bValue === null) return 1;
+                
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'ascending' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'ascending' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return sortableItems;
+    }, [requests, sortConfig]);
+
+    const requestSort = (key: keyof Request) => {
+        let direction = 'ascending';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
     if (error) return <div className="alert error">{error}</div>;
 
     return (
@@ -95,19 +126,19 @@ const IncomingRequestList: React.FC<IncomingRequestListProps> = ({ viewMode }) =
                         <table className="requests-table">
                             <thead>
                                 <tr>
-                                    <th>Request ID</th>
-                                    <th>Patient Name</th>
-                                    <th>Blood Type</th>
-                                    <th>Urgency</th>
-                                    <th>Quantity</th>
-                                    <th>Status</th>
-                                    <th>Special Requirements</th>
-                                    <th>Required Date</th>
+                                    <th onClick={() => requestSort('RequestID')}>Request ID</th>
+                                    <th onClick={() => requestSort('PatientName')}>Patient Name</th>
+                                    <th onClick={() => requestSort('PatientBloodType')}>Blood Type</th>
+                                    <th onClick={() => requestSort('Urgency')}>Urgency</th>
+                                    <th onClick={() => requestSort('Quantity')}>Quantity</th>
+                                    <th onClick={() => requestSort('Status')}>Status</th>
+                                    <th onClick={() => requestSort('SpecialRequirements')}>Special Requirements</th>
+                                    <th onClick={() => requestSort('RequiredAt')}>Required Date</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {requests.map((req) => (
+                                {sortedRequests.map((req) => (
                                     <tr key={req.RequestID}>
                                         <td>{req.RequestID}</td>
                                         <td>{req.PatientName}</td>

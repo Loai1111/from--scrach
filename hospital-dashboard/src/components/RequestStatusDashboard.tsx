@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import { SocketContext } from '../App';
 import './RequestStatusDashboard.css';
 
 interface Request {
@@ -16,7 +17,6 @@ interface Request {
 }
 
 const API_URL = 'http://localhost:3003';
-const WS_URL = 'ws://localhost:3003';
 
 const formatDate = (dateString: string) => {
     if (!dateString) return '_';
@@ -34,12 +34,14 @@ const RequestStatusDashboard = () => {
     const [requests, setRequests] = useState<Request[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const { socket } = useContext(SocketContext);
 
     const fetchRequests = async () => {
         setError(null);
         try {
             const response = await axios.get(`${API_URL}/requests`);
             setRequests(response.data);
+            console.log('Fetched requests:', response.data);
         } catch (err) {
             setError('Failed to fetch requests. Is the backend server running?');
             console.error(err);
@@ -58,17 +60,31 @@ const RequestStatusDashboard = () => {
         }
     };
 
+    const handleDeliverRequest = async (requestId: number) => {
+        if (window.confirm('Are you sure you want to mark this request as received?')) {
+            try {
+                await axios.post(`${API_URL}/requests/${requestId}/deliver`);
+                fetchRequests(); // Refresh the list
+            } catch (err) {
+                setError('Failed to mark request as delivered.');
+                console.error(err);
+            }
+        }
+    };
+
     useEffect(() => {
         fetchRequests();
-        const ws = new WebSocket(WS_URL);
-        ws.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            if (message.type === 'new_update') {
-                fetchRequests();
+
+        if (socket) {
+            socket.on('inventory_updated', fetchRequests);
+        }
+
+        return () => {
+            if (socket) {
+                socket.off('inventory_updated', fetchRequests);
             }
         };
-        return () => ws.close();
-    }, []);
+    }, [socket]);
 
     if (isLoading) {
         return <div>Loading requests...</div>;
@@ -127,6 +143,11 @@ const RequestStatusDashboard = () => {
                                     {req.Status === 'PENDING_REVIEW' && (
                                         <button onClick={() => handleCancelRequest(req.RequestID)} className="cancel-btn">
                                             Cancel
+                                        </button>
+                                    )}
+                                    {req.Status === 'ALLOCATED' && (
+                                        <button onClick={() => handleDeliverRequest(req.RequestID)} className="deliver-btn">
+                                            Mark as Received
                                         </button>
                                     )}
                                 </td>

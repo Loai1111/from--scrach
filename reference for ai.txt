@@ -265,8 +265,7 @@ PENDING_CROSSMATCH	System finds a suitable bag in inventory.
 ESCALATED_TO_DONORS (no stock)	System finds no suitable bag in inventory. 
 ESCALATED_TO_DONORS (crossmatch_negative)	crossmatch negative for suitable bags
 	
-ALLOCATED	Staff confirms successful cross-match.
-PENDING_CROSSMATCH	Staff allocates a newly donated bag(s) to this request.
+ALLOCATED	Staff confirms successful cross-match.  
 ISSUED	Staff dispatches the allocated bag.
 FULFILLED /	Hospital user confirms receiving blood bag(s) , by clicking received on their interface.
 CANCELLED_BY_HOSPITAL	Hospital staff manually cancels.

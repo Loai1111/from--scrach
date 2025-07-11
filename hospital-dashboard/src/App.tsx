@@ -1,3 +1,4 @@
+import NotificationsView from './views/NotificationsView';
 import React, { useState, createContext, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
@@ -60,7 +61,7 @@ function App() {
                                         <option value="bloodBank">Blood Bank Staff</option>
                                     </select>
                                 </div>
-                               <NotificationBell role={currentRole} />
+                               <NotificationBell />
                             </div>
                             <nav className="App-nav">
                                 {currentRole === 'hospital' && (
@@ -75,11 +76,13 @@ function App() {
                                         <NavLink to="/inventory">Manage Inventory</NavLink>
                                     </>
                                 )}
+                               <NavLink to="/notifications">Notifications</NavLink>
                             </nav>
                         </header>
                         <main className="container">
                             <Routes>
                                 <Route path="/*" element={currentRole === 'hospital' ? <HospitalView /> : <BloodBankView />} />
+                                <Route path="/notifications" element={<NotificationsView />} />
                             </Routes>
                         </main>
                     </div>
