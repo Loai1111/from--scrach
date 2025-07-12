@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:lifeline/pages/DonateHistory.dart';
 import 'package:lifeline/pages/eligibility.dart';
@@ -118,6 +119,15 @@ class _DashboardState extends State<Dashboard> {
                 mainAxisSpacing: 16,
                 childAspectRatio: 1.3,
                 children: [
+                  _buildDashboardButton(
+                    icon: Icons.cloud_upload_outlined,
+                    label: 'Verify Connection',
+                    onTap: () {
+                      FirebaseFirestore.instance
+                          .collection('verification')
+                          .add({'timestamp': FieldValue.serverTimestamp()});
+                    },
+                  ),
                   _buildDashboardButton(
                     icon: Icons.check_circle_outline,
                     label: 'Eligibility',
