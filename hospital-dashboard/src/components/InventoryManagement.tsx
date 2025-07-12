@@ -241,29 +241,34 @@ const InventoryManagement = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {sortedInventory.map((bag) => (
-                            <tr key={bag.BagID}>
-                                <td>{bag.BagID}</td>
-                                <td>{bag.DonorName || '_'}</td>
-                                <td>{bag.BloodType || 'N/A'}</td>
-                                <td>{new Date(bag.CollectionDate).toLocaleDateString()}</td>
-                                <td>{new Date(bag.ExpiryDate).toLocaleDateString()}</td>
-                                <td className={`status-${bag.Status.toLowerCase()}`}>{bag.Status}</td>
-                                <td>
-                                    <button onClick={() => handleUpdateClick(bag)} className="update-btn">
-                                        Update
-                                    </button>
-                                    <button onClick={() => handleDeleteBag(bag.BagID)} className="delete-btn">
-                                        Delete
-                                    </button>
-                                    {bag.Status === 'Expired' && (
-                                        <button onClick={() => handleDisposeBag(bag.BagID)} className="dispose-btn">
-                                            Dispose
+                        {sortedInventory.map((bag) => {
+                            const status = bag.Status && bag.Status !== 'null' ? bag.Status : null;
+                            const displayStatus = status || 'N/A';
+                            const statusClass = (status || '').toLowerCase();
+                            return (
+                                <tr key={bag.BagID}>
+                                    <td>{bag.BagID}</td>
+                                    <td>{bag.DonorName || '_'}</td>
+                                    <td>{bag.BloodType || 'N/A'}</td>
+                                    <td>{new Date(bag.CollectionDate).toLocaleDateString()}</td>
+                                    <td>{new Date(bag.ExpiryDate).toLocaleDateString()}</td>
+                                    <td className={`status-${statusClass}`}>{displayStatus}</td>
+                                    <td>
+                                        <button onClick={() => handleUpdateClick(bag)} className="update-btn">
+                                            Update
                                         </button>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
+                                        <button onClick={() => handleDeleteBag(bag.BagID)} className="delete-btn">
+                                            Delete
+                                        </button>
+                                        {bag.Status === 'Expired' && (
+                                            <button onClick={() => handleDisposeBag(bag.BagID)} className="dispose-btn">
+                                                Dispose
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
