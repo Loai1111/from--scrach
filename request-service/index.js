@@ -867,6 +867,28 @@ app.post('/requests/:id/reserve', async (req, res) => {
     }
 });
 
+app.post('/submit-answers', async (req, res) => {
+    const answers = req.body;
+    const connection = await mysql.createConnection(dbConfig);
+    try {
+        await connection.beginTransaction();
+        for (const answer of answers) {
+            await connection.execute(
+                'INSERT INTO Eligibility (UserID, QuestionID, Answer) VALUES (?, ?, ?)',
+                [1, answer.questionId, answer.answer] // Assuming a static UserID for now
+            );
+        }
+        await connection.commit();
+        res.status(200).json({ eligible: true });
+    } catch (error) {
+        await connection.rollback();
+        console.error('Failed to submit answers:', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    } finally {
+        await connection.end();
+    }
+});
+
 // --- Debugging Endpoint ---
 app.get('/debug/db-check', async (req, res) => {
     let connection;

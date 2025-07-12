@@ -20,6 +20,7 @@ SET time_zone = "+00:00";
 --
 -- Database: `lifeline_db_1`
 --
+USE `lifeline_db_1`;
 
 --
 -- Disabling foreign key checks
@@ -111,6 +112,17 @@ CREATE TABLE `requestbags` (
   `RequestID` int(11) NOT NULL,
   `BagID` int(11) NOT NULL,
   `AssignedAt` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Table structure for table `eligibility`
+--
+CREATE TABLE `eligibility` (
+  `EligibilityID` int(11) NOT NULL,
+  `UserID` int(11) NOT NULL,
+  `QuestionID` int(11) NOT NULL,
+  `Answer` tinyint(1) NOT NULL,
+  `CreatedAt` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
