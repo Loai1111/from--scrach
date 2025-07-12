@@ -1,0 +1,10 @@
+USE lifeline_db_1;
+
+CREATE TABLE eligibility (
+  EligibilityID INT NOT NULL AUTO_INCREMENT,
+  UserID INT NOT NULL,
+  QuestionID INT NOT NULL,
+  Answer BOOLEAN NOT NULL,
+  CreatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (EligibilityID)
+);
