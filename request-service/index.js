@@ -605,6 +605,22 @@ app.get('/donors', async (req, res) => {
         res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 });
+app.get('/profile/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const connection = await mysql.createConnection(dbConfig);
+        const [rows] = await connection.execute('SELECT DonorName as name, Email, BloodType, DateOfBirth, PhoneNumber FROM Donors WHERE DonorID = ?', [id]);
+        await connection.end();
+        if (rows.length > 0) {
+            res.status(200).json(rows[0]);
+        } else {
+            res.status(404).json({ message: 'Donor not found' });
+        }
+    } catch (error) {
+        console.error('Database Error:', error);
+        res.status(500).json({ message: 'Internal Server Error', error: error.message });
+    }
+});
 
 app.get('/inventory', async (req, res) => {
     try {

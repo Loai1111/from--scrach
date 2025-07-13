@@ -16,6 +16,8 @@ class _ProfileState extends State<Profile> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _bloodTypeController = TextEditingController();
+  final TextEditingController _dateOfBirthController = TextEditingController();
+  final TextEditingController _phoneNumberController = TextEditingController();
 
   @override
   void initState() {
@@ -25,7 +27,7 @@ class _ProfileState extends State<Profile> {
 
   Future<UserProfile> _fetchProfile() async {
     final response =
-        await http.get(Uri.parse('https://your-backend-api.com/profile'));
+        await http.get(Uri.parse('http://localhost:3003/profile/1'));
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -33,6 +35,8 @@ class _ProfileState extends State<Profile> {
       _nameController.text = profile.name;
       _emailController.text = profile.email;
       _bloodTypeController.text = profile.bloodType;
+      _dateOfBirthController.text = profile.dateOfBirth ?? '';
+      _phoneNumberController.text = profile.phoneNumber ?? '';
       return profile;
     } else {
       throw Exception('Failed to load profile');
@@ -44,10 +48,12 @@ class _ProfileState extends State<Profile> {
       name: _nameController.text,
       email: _emailController.text,
       bloodType: _bloodTypeController.text,
+      dateOfBirth: _dateOfBirthController.text,
+      phoneNumber: _phoneNumberController.text,
     );
 
     final response = await http.post(
-      Uri.parse('https://your-backend-api.com/profile'),
+      Uri.parse('http://localhost:3003/profile/1'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(profile.toJson()),
     );
@@ -104,6 +110,14 @@ class _ProfileState extends State<Profile> {
                   TextField(
                     controller: _bloodTypeController,
                     decoration: const InputDecoration(labelText: 'Blood Type'),
+                  ),
+                  TextField(
+                    controller: _dateOfBirthController,
+                    decoration: const InputDecoration(labelText: 'Date of Birth'),
+                  ),
+                  TextField(
+                    controller: _phoneNumberController,
+                    decoration: const InputDecoration(labelText: 'Phone Number'),
                   ),
                   const SizedBox(height: 30),
                   ElevatedButton(
