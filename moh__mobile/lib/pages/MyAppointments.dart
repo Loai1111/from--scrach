@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 class MyAppointments extends StatefulWidget {
   const MyAppointments({super.key});
 

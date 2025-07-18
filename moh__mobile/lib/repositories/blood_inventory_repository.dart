@@ -1,18 +1,51 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lifeline/models/BloodBag.dart';
-import 'package:lifeline/services/config_service.dart';
 
 class BloodInventoryRepository {
-  Future<List<BloodBag>> fetchBloodBags() async {
-    final response = await http.get(Uri.parse('${ConfigService.apiUrl}/inventory'));
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-    if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      return data.map((json) => BloodBag.fromJson(json)).toList();
+  Future<void> checkAndExpireBags() async {
+    print("Checking for expired blood bags...");
+    final bagsCollection = _firestore.collection('bloodbags');
+    final q = bagsCollection.where("status", whereIn: ["Available", "Crossmatching"]);
+    final querySnapshot = await q.get();
+
+    final batch = _firestore.batch();
+    final thirtyFiveDaysAgo = DateTime.now().subtract(const Duration(days: 35));
+
+    int expiredCount = 0;
+
+    for (var docSnap in querySnapshot.docs) {
+      final bag = docSnap.data();
+      // Ensure donatedAt exists and is a Firestore Timestamp
+      if (bag['donatedAt'] != null && bag['donatedAt'] is Timestamp) {
+        final donationDate = (bag['donatedAt'] as Timestamp).toDate();
+        if (donationDate.isBefore(thirtyFiveDaysAgo)) {
+          final bagRef = _firestore.collection('bloodbags').doc(docSnap.id);
+          batch.update(bagRef, {'status': 'Expired'});
+          expiredCount++;
+        }
+      }
+    }
+
+    if (expiredCount > 0) {
+      await batch.commit();
+      print('Successfully marked $expiredCount blood bag(s) as Expired.');
     } else {
-      print('Failed to load blood bags. Status code: ${response.statusCode}');
-      print('Response body: ${response.body}');
+      print("No expired blood bags found.");
+    }
+  }
+
+  Future<List<BloodBag>> fetchBloodBags() async {
+    try {
+      await checkAndExpireBags();
+      final snapshot = await _firestore
+          .collection('bloodbags')
+          .where('status', isEqualTo: 'Available')
+          .get();
+      return snapshot.docs.map((doc) => BloodBag.fromFirestore(doc)).toList();
+    } catch (e) {
+      print('Failed to load blood bags from Firestore: $e');
       throw Exception('Failed to load blood bags');
     }
   }

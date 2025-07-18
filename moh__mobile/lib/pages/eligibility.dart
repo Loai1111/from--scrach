@@ -1,7 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lifeline/models/Questionnaire.dart';
+import 'package:lifeline/providers/auth_provider.dart';
 import 'package:lifeline/providers/eligibility_provider.dart';
 
 class EligibilityPage extends ConsumerStatefulWidget {
@@ -12,100 +12,179 @@ class EligibilityPage extends ConsumerStatefulWidget {
 }
 
 class _EligibilityPageState extends ConsumerState<EligibilityPage> {
+  final _formKey = GlobalKey<FormState>();
   final Map<String, bool> _answers = {};
+  final _nationalIdController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _phoneController = TextEditingController();
 
-  Future<void> submitAnswers(List<Question> questions) async {
-    final eligibilityRepository = ref.read(eligibilityRepositoryProvider);
-    final answers = _answers.entries.map((entry) {
-      return {'questionId': entry.key, 'answer': entry.value};
-    }).toList();
+  @override
+  void dispose() {
+    _nationalIdController.dispose();
+    _addressController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
 
-    final response = await eligibilityRepository.submitAnswers(answers);
-
-    if (response.statusCode == 200) {
-      final result = json.decode(response.body);
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Result'),
-          content: Text(result['eligible']
-              ? 'You are eligible to donate blood!'
-              : 'You are NOT eligible to donate blood at this time.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                if (result['eligible']) Navigator.pop(context);
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Error'),
-          content: const Text('Failed to submit answers. Please try again.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+  void _submitForm() async {
+    if (_formKey.currentState!.validate()) {
+      final result = await ref
+          .read(eligibilityNotifierProvider.notifier)
+          .processAndSubmitQuestionnaire(
+            _answers,
+            nationalId: _nationalIdController.text,
+            address: _addressController.text,
+            phone: _phoneController.text,
+          );
+      _showResultDialog(result);
     }
   }
 
-  Widget buildQuestion(Question question) {
+  void _showResultDialog(String result) {
+    String title;
+    String content;
+
+    switch (result) {
+      case 'Pass':
+        title = 'Eligibility Status';
+        content = 'You are eligible to donate.';
+        break;
+      case 'Permanent Disqualification':
+        title = 'Eligibility Status';
+        content =
+            'You are permanently disqualified from donating due to a medical condition indicated in your answers.';
+        break;
+      case 'Temporary Disqualification':
+        title = 'Eligibility Status';
+        content = 'You are temporarily disqualified from donating.';
+        break;
+      default:
+        title = 'Submission Successful';
+        content =
+            'Your questionnaire has been submitted. You will be notified of the result.';
+    }
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: Text(content),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context); // Go back to the previous page
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final questions = ref.watch(eligibilityQuestionsProvider);
+    final userAsyncValue = ref.watch(userProvider);
+    final latestDonationAsyncValue = ref.watch(latestDonationProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Eligibility Test')),
+      body: userAsyncValue.when(
+        data: (user) {
+          if (user == null) {
+            return const Center(child: Text('User not found. Please log in.'));
+          }
+          final latestDonation = latestDonationAsyncValue.value;
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionTitle('Eligibility Questionnaire'),
+                  if (questions.isEmpty)
+                    const Center(child: Text('No questions available.'))
+                  else
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: questions.length,
+                      itemBuilder: (context, index) {
+                        final question = questions[index];
+                        _answers.putIfAbsent(question.id, () => false);
+                        return _buildQuestion(question);
+                      },
+                    ),
+                  const SizedBox(height: 24),
+                  _buildSectionTitle('Additional Information'),
+                  TextFormField(
+                    controller: _nationalIdController,
+                    decoration: const InputDecoration(labelText: 'National ID'),
+                    validator: (value) => value!.isEmpty ? 'Please enter your National ID' : null,
+                  ),
+                  TextFormField(
+                    controller: _addressController,
+                    decoration: const InputDecoration(labelText: 'Address'),
+                     validator: (value) => value!.isEmpty ? 'Please enter your address' : null,
+                  ),
+                  TextFormField(
+                    controller: _phoneController,
+                    decoration: const InputDecoration(labelText: 'Phone Number'),
+                     validator: (value) => value!.isEmpty ? 'Please enter your phone number' : null,
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _submitForm,
+                      child: const Text('Submit'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, st) => Center(child: Text('Error loading user: $e')),
+      ),
+    );
+  }
+
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Text(title, style: Theme.of(context).textTheme.headlineSmall),
+    );
+  }
+
+
+  Widget _buildQuestion(Question question) {
     return Card(
-      margin: EdgeInsets.symmetric(vertical: 8),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(vertical: 8),
       child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(question.text,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.red[700],
-                )),
-            SizedBox(height: 12),
+            Text(question.text, style: const TextStyle(fontSize: 16)),
             Row(
               children: [
-                Expanded(
-                  child: RadioListTile<bool>(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('Yes'),
-                    value: true,
-                    groupValue: _answers[question.id],
-                    activeColor: Colors.red,
-                    onChanged: (val) {
-                      setState(() {
-                        _answers[question.id] = val!;
-                      });
-                    },
-                  ),
+                Radio<bool>(
+                  value: true,
+                  groupValue: _answers[question.id],
+                  onChanged: (val) => setState(() => _answers[question.id] = val!),
                 ),
-                Expanded(
-                  child: RadioListTile<bool>(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('No'),
-                    value: false,
-                    groupValue: _answers[question.id],
-                    activeColor: Colors.red,
-                    onChanged: (val) {
-                      setState(() {
-                        _answers[question.id] = val!;
-                      });
-                    },
-                  ),
+                const Text('Yes'),
+                Radio<bool>(
+                  value: false,
+                  groupValue: _answers[question.id],
+                  onChanged: (val) => setState(() => _answers[question.id] = val!),
                 ),
+                const Text('No'),
               ],
             ),
           ],
@@ -113,77 +192,6 @@ class _EligibilityPageState extends ConsumerState<EligibilityPage> {
       ),
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.red[50],
-      appBar: AppBar(
-        title: Text('Eligibility Test'),
-        centerTitle: true,
-        backgroundColor: Colors.red[800],
-      ),
-      body: ref.watch(eligibilityQuestionsProvider).when(
-            data: (questions) {
-              if (questions.isEmpty) {
-                return const Center(child: Text('No questions available.'));
-              }
-              return SingleChildScrollView(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Please answer the following questions:',
-                      style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 20),
-                    ...questions.map((q) => buildQuestion(q)).toList(),
-                    const SizedBox(height: 30),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        minimumSize: const Size(double.infinity, 50),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: () {
-                        if (_answers.length == questions.length) {
-                          submitAnswers(questions);
-                        } else {
-                          showDialog(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              title: const Text('Incomplete'),
-                              content: const Text(
-                                  'Please answer all the questions before submitting.'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text('OK'),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                      },
-                      child: const Text(
-                        'Submit',
-                        style: TextStyle(color: Colors.black, fontSize: 18),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stack) => Center(child: Text('Error: $error')),
-          ),
-    );
-  }
 }
+
+

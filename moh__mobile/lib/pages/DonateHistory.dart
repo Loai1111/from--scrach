@@ -1,24 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lifeline/models/Donation.dart';
 import 'package:lifeline/providers/donation_history_provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-
-class Donation {
-  final String date;
-  final String location;
-  final String bloodType;
-
-  Donation(
-      {required this.date, required this.location, required this.bloodType});
-
-  factory Donation.fromJson(Map<String, dynamic> json) {
-    return Donation(
-      date: json['date'],
-      location: json['location'],
-      bloodType: json['bloodType'],
-    );
-  }
-}
+import 'package:intl/intl.dart';
 
 class Donatehistory extends ConsumerWidget {
   const Donatehistory({super.key});
@@ -54,20 +39,18 @@ class Donatehistory extends ConsumerWidget {
               ],
             );
           }
-          final donationObjects =
-              data.map((item) => Donation.fromJson(item)).toList();
           return ListView.builder(
-            itemCount: donationObjects.length,
+            itemCount: data.length,
             itemBuilder: (context, index) {
-              Donation donation = donationObjects[index];
+              Donation donation = data[index];
               return Card(
                 margin:
                     const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                 child: ListTile(
                   leading: const Icon(LucideIcons.droplet, color: Colors.red),
-                  title: Text('Location: ${donation.location}'),
+                  title: Text('Status: ${donation.status}'),
                   subtitle: Text(
-                      'Date: ${donation.date} - Blood Type: ${donation.bloodType}'),
+                      'Date: ${DateFormat.yMMMd().format(donation.donatedAt)}'),
                 ),
               );
             },

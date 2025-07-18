@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | Lifeline</title>
+    <link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Admin Dashboard</h1>
+            <button id="logout-btn" class="btn">Logout</button>
+        </header>
+        <main>
+            <div class="user-management">
+                <h2>User Management</h2>
+                <div class="tabs">
+                    <button class="tab-link active" data-tab="hospital-users">Hospital Users</button>
+                    <button class="tab-link" data-tab="bloodbank-users">Blood Bank Users</button>
+                </div>
+
+                <div id="hospital-users" class="tab-content active">
+                    <h3>Hospital Users</h3>
+                    <button id="add-hospital-user-btn" class="btn">Add Hospital User</button>
+                    <table id="hospital-users-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <div id="bloodbank-users" class="tab-content">
+                    <h3>Blood Bank Users</h3>
+                    <button id="add-bloodbank-user-btn" class="btn">Add Blood Bank User</button>
+                    <table id="bloodbank-users-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="user-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h3 id="modal-title">Add User</h3>
+            <form id="user-form">
+                <input type="hidden" id="user-id">
+                <input type="hidden" id="user-type">
+                <div class="form-group">
+                    <label for="user-name">Name</label>
+                    <input type="text" id="user-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="user-email">Email</label>
+                    <input type="email" id="user-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="user-password">Password</label>
+                    <input type="password" id="user-password">
+                </div>
+                <button type="submit" class="btn">Save</button>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="../scripts/views/admin/main.js"></script>
+</body>
+</html>

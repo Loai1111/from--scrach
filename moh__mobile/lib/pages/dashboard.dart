@@ -1,19 +1,22 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lifeline/pages/DonateHistory.dart';
+import 'package:lifeline/pages/LoginPage.dart';
 import 'package:lifeline/pages/eligibility.dart';
 import 'package:lifeline/pages/BloodInventory.dart';
 import 'package:lifeline/pages/Profile.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:lifeline/providers/auth_provider.dart';
 
-class Dashboard extends StatefulWidget {
+class Dashboard extends ConsumerStatefulWidget {
   const Dashboard({super.key});
 
   @override
-  State<Dashboard> createState() => _DashboardState();
+  ConsumerState<Dashboard> createState() => _DashboardState();
 }
 
-class _DashboardState extends State<Dashboard> {
+class _DashboardState extends ConsumerState<Dashboard> {
   String donorname = 'Mohammed';
 
   @override
@@ -47,7 +50,11 @@ class _DashboardState extends State<Dashboard> {
                     Navigator.push(context,
                         MaterialPageRoute(builder: (context) => Profile()));
                   } else if (value == 'logout') {
-                    // Implement logout functionality
+                    ref.read(authRepositoryProvider).signOut();
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => LoginPage()),
+                    );
                   }
                 });
               },

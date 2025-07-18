@@ -1,0 +1,277 @@
+
+
+ donors table 
+ email or phone number (the donor can fill one of these but at least one of them even if from hospital) 
+ password (for mobile app donors) 
+ full name 
+ date of birth 
+ sex 
+ bloodtype 
+ source(whether from the mobile app or  physical bloodbank,
+ if entered from bloodbank then source is automatically set to bloodbank,
+ if mobile then automatically set to mobile) 
+ createdAt
+ donations recorded (donations history counter, each time successfully donating)
+
+
+
+
+ requests table 
+ request ID 
+ patient ID 
+ condition (a string to describe the condition, doesnt matter for system it also functions as a comments field)
+ userID(from the doctors table obviously) 
+ quantity 
+ createdAt 
+ all the counters you already made to manage status (like pendingCount, allocatedCount) 
+ status 
+ urgency (either scheduled and if so then set a date, urgent, or emergency) 
+ scheduledAt (if scheduled) 
+ (no hospitalID, there is only 1 hospital in the project) 
+
+ donations table 
+ donor ID
+ bloodbag ID (automatically created by firebase, not inserted manually) 
+ donatedAt (donation automatically creates a new bloodbag with these information inserted) 
+
+ bloodbags table 
+ blood bag ID (auto generated when donation happened) 
+ donorID (automatically filled from donation) 
+ donatedAt(expires after 35 days automatically, status changes to expired, and is no longer considerable when crossmatching) 
+ bloodtype (automatic from the donor's type) 
+ status
+ expiry date
+
+ notifications 
+ destination (either to bloodbank, hospital or donor mobile user) 
+notificationID
+isRead
+ message 
+ createdAt  
+ 
+
+
+ patients table 
+ full name 
+ patient ID 
+ bloodType
+
+
+ hospitalusers table 
+ full name
+ userID 
+ email
+ password 
+
+
+ bloodbankuser table 
+ full name 
+ userID 
+ email
+ password 
+
+
+
+ note: these names are not strict except status names, but column or field names are not strict. 
+ also add anything you think i missed 
+ tests tables will be created after these
+for now understand these and the next batch of text will include the tests
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+—---------------------------------------
+
+Strict disqualification:
+
+—---------------------------------------
+
+Severe and chronic allergic diseases.
+
+Chronic diseases such as diabetes, chronic heart disease, kidney disease, and lung disease.
+
+Cancers.
+
+If the donor has experienced adverse reactions to blood donation more than twice.
+
+Jaundice and liver diseases.
+
+Addiction to medications or illicit drugs.
+
+Sexual deviants
+
+AIDS and sexually transmitted diseases (STDs).
+
+Epilepsy.
+
+Blood diseases and hereditary bleeding disorders.
+
+Infection with viral Hepatitis B or C.
+
+Leprosy.
+
+Schizophrenia.
+
+Vitiligo.
+
+Unexplained weight loss.
+
+Endocrine disorders.
+
+Polycythemia Vera.
+
+Brucellosis infection.
+
+Neurosurgery, organ transplantation, stem cell transplantation, and corneal transplantation.
+
+
+
+------------------------------------------
+
+Conditions health screening
+
+------------------------------------------
+
+one donation per 3 months for males and 6 months for females
+
+age is 18 to 55 for men and 18 to 50 for women
+
+minimum weight for men and women is 50kg for donating 450ml of blood
+
+
+
+systolic blood pressure
+
+diastolic blood pressure
+
+heart beat rate 60-100 BPM
+
+body temperature not more than 37.5 Celsius. (36.5-37.5)
+
+The donor must not suffer from any skin disease or have skin punctures (which indicates a recent donation) or scarring at the needle site (which indicates high-risk behavior by the donor, such as being a drug user).
+
+
+
+------------------------------------------
+
+lab tests conditions
+
+------------------------------------------
+
+The donor's temperature and pulse must be normal:
+
+
+
+Temperature: 36.5–37.5 degrees Celsius.
+
+Pulse: 60–100 beats/minute.
+
+Hemoglobin (blood concentration):
+
+
+
+Male: 14–18 g/dL.
+
+Female: 12.5–16 g/dL.
+
+Hematocrit percentage (PCV% / HCT%):
+
+
+
+Male: 42%–54%.
+
+Female: 38%–48%.
+
+
+
+
+
+
+
+so now here is how it goes
+
+
+
+these are of 2 types.
+
+one type are things a person would know like did u sleep well, and things he wouldnt know. like blood pressure or viruses. the majority are type 1, they should be in the eligibility questionnaire, and the database should handle all the information
+
+
+
+type 2 are for health screening or lab tests. health screening deals with blood pressure, heart beat, physical inspection by blood bank doctor , regarding skin colour or needle marks, or being overweight too skinny etc.
+
+
+
+3rd is lab test. this is for viruses, hemoglobin percentage, etc.
+
+
+
+these tests should have all the above mentioned data alongside these ideas i want you to add
+
+
+
+questionnaire should include the following:
+
+questionnaireID (auto generated)
+
+current living address, national ID, phone number, email (some of these can be automatically recorded without the need of the user ro manually write them down again. if donor from bloodbank or when mobile app user enters his phone number in the account if he inserted his phone number otherwise should be manually written)
+
+donorID (automatically recorded)
+
+date of latest donation
+
+
+
+
+
+
+
+health screening should include :
+
+
+
+weight (rules apply for male vs female)
+
+questionnaireID (the bloodbank user must select a questionnaire to build the screening based on it. through searching questionnaires by id or donor ID or donor name) to know who does this questionnaire belong to, donor information should be extracted the the donor id in the questionnaire and displayed in the front end.
+
+
+
+lab tests should include an ID for the health screening for the same purpose. extract donor information and build this based on a valid health screening
+
+
+
+
+
+all tests should have result
+
+results are
+
+pass (for all)
+
+temporary disqualification (for all for example not enough hemoglobin percentage is what makes lab test temporary disqualified)
+
+permanent disqualification (for all, a doctor may observe a permanent skin disease or a virus is found in a lab test or donor answers yes he has a virus that causes permanent disqualification)
+
+
+
+with all that in mind, i want you first to ask me if you still have any questions about the database purpose connections fields and logic
+
+
+
+after that make all i requested a reality in as many responses and parts as you need

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lifeline/models/BloodBag.dart';
 import 'package:lifeline/providers/blood_inventory_provider.dart';
 
 class Bloodinventory extends ConsumerWidget {
@@ -11,7 +10,7 @@ class Bloodinventory extends ConsumerWidget {
     final bloodInventory = ref.watch(bloodInventoryProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Blood Inventory'),
+        title: const Text('Blood Bags Available'),
         centerTitle: true,
         backgroundColor: Colors.red[800],
       ),
@@ -27,8 +26,6 @@ class Bloodinventory extends ConsumerWidget {
                 margin: const EdgeInsets.all(8.0),
                 child: ListTile(
                   title: Text('Blood Type: ${data[index].bloodType}'),
-                  subtitle: Text('Donor: ${data[index].donorName ?? 'N/A'}'),
-                  trailing: Text('Status: ${data[index].status ?? 'N/A'}'),
                 ),
               );
             },

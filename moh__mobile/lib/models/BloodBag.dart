@@ -1,31 +1,70 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class BloodBag {
-  final int bagID;
-  final int? donorID;
-  final String? donorName;
+  final String id;
+  final String donorId;
   final String bloodType;
-  final String? collectionDate;
-  final String? expiryDate;
-  final String? status;
+  final String status;
+  final DateTime donatedAt;
+  final DateTime expiryDate;
 
   BloodBag({
-    required this.bagID,
-    this.donorID,
-    this.donorName,
+    required this.id,
+    required this.donorId,
     required this.bloodType,
-    this.collectionDate,
-    this.expiryDate,
-    this.status,
+    required this.status,
+    required this.donatedAt,
+    required this.expiryDate,
   });
+
+  BloodBag copyWith({
+    String? id,
+    String? donorId,
+    String? bloodType,
+    String? status,
+    DateTime? donatedAt,
+    DateTime? expiryDate,
+  }) {
+    return BloodBag(
+      id: id ?? this.id,
+      donorId: donorId ?? this.donorId,
+      bloodType: bloodType ?? this.bloodType,
+      status: status ?? this.status,
+      donatedAt: donatedAt ?? this.donatedAt,
+      expiryDate: expiryDate ?? this.expiryDate,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'donorId': donorId,
+      'bloodType': bloodType,
+      'status': status,
+      'donatedAt': Timestamp.fromDate(donatedAt),
+      'expiryDate': Timestamp.fromDate(expiryDate),
+    };
+  }
 
   factory BloodBag.fromJson(Map<String, dynamic> json) {
     return BloodBag(
-      bagID: json['BagID'],
-      donorID: json['DonorID'],
-      donorName: json['DonorName'],
-      bloodType: json['BloodType'] ?? 'Unknown',
-      collectionDate: json['CollectionDate'],
-      expiryDate: json['ExpiryDate'],
-      status: json['status'] ?? 'Unknown',
+      id: json['id'],
+      donorId: json['donorId'],
+      bloodType: json['bloodType'],
+      status: json['status'],
+      donatedAt: (json['donatedAt'] as Timestamp).toDate(),
+      expiryDate: (json['expiryDate'] as Timestamp).toDate(),
+    );
+  }
+
+  factory BloodBag.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    return BloodBag(
+      id: doc.id,
+      donorId: data['donorId'],
+      bloodType: data['bloodType'],
+      status: data['status'],
+      donatedAt: (data['donatedAt'] as Timestamp).toDate(),
+      expiryDate: (data['expiryDate'] as Timestamp).toDate(),
     );
   }
 }
