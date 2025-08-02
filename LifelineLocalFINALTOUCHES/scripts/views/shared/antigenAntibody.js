@@ -29,15 +29,27 @@ const ANTIGEN_ANTIBODY_PAIRS = [
  * @param {string} prefix - A unique prefix for the element IDs (e.g., 'donor', 'patient').
  * @returns {string} The HTML string for the UI component.
  */
-export function createAntigenAntibodyUI(prefix) {
+export function createAntigenAntibodyUI(prefix, antigensOnly = false) {
     const buttons = (type, list) => list.map(item => `
-        <button type="button" 
-                data-group="${prefix}-${type}" 
+        <button type="button"
+                data-group="${prefix}-${type}"
                 data-value="${item}"
                 class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 text-xs rounded-md transition-colors duration-150 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed m-1">
             ${item}
         </button>
     `).join('');
+
+    let antibodySection = '';
+    if (!antigensOnly) {
+        antibodySection = `
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Antibody History</label>
+                <div class="flex flex-wrap gap-2">
+                    ${buttons('antibody', ANTIGEN_ANTIBODY_PAIRS.map(p => p.antibody))}
+                </div>
+            </div>
+        `;
+    }
 
     return `
         <div id="${prefix}-antigen-antibody-selector" class="space-y-4">
@@ -47,12 +59,7 @@ export function createAntigenAntibodyUI(prefix) {
                     ${buttons('antigen', ANTIGEN_ANTIBODY_PAIRS.map(p => p.antigen))}
                 </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Antibody History</label>
-                <div class="flex flex-wrap gap-2">
-                    ${buttons('antibody', ANTIGEN_ANTIBODY_PAIRS.map(p => p.antibody))}
-                </div>
-            </div>
+            ${antibodySection}
         </div>
     `;
 }
@@ -61,12 +68,12 @@ export function createAntigenAntibodyUI(prefix) {
  * Initializes the interactive logic for the antigen/antibody UI.
  * @param {string} prefix - The unique prefix used when creating the UI.
  */
-export function initAntigenAntibodyUI(prefix) {
+export function initAntigenAntibodyUI(prefix, antigensOnly = false) {
     const container = document.getElementById(`${prefix}-antigen-antibody-selector`);
     if (!container) return;
 
     const antigenButtons = Array.from(container.querySelectorAll(`[data-group="${prefix}-antigen"]`));
-    const antibodyButtons = Array.from(container.querySelectorAll(`[data-group="${prefix}-antibody"]`));
+    const antibodyButtons = antigensOnly ? [] : Array.from(container.querySelectorAll(`[data-group="${prefix}-antibody"]`));
 
     const updateOppositeButton = (clickedButton, oppositeButtons) => {
         const value = clickedButton.dataset.value;
@@ -95,11 +102,10 @@ export function initAntigenAntibodyUI(prefix) {
         button.classList.toggle('text-white', button.classList.contains('selected'));
         button.classList.toggle('bg-gray-200', !button.classList.contains('selected'));
 
-
         const group = button.dataset.group;
-        if (group.endsWith('-antigen')) {
+        if (group.endsWith('-antigen') && !antigensOnly) {
             updateOppositeButton(button, antibodyButtons);
-        } else if (group.endsWith('-antibody')) {
+        } else if (group.endsWith('-antibody') && !antigensOnly) {
             updateOppositeButton(button, antigenButtons);
         }
     };
@@ -145,7 +151,7 @@ export function setSelectedButtons(prefix, antigens = [], antibodies = []) {
  * @param {string} prefix - The unique prefix for the UI.
  * @returns {{antigens: string[], antibodies: string[]}}
  */
-export function getSelectedValues(prefix) {
+export function getSelectedValues(prefix, antigensOnly = false) {
     const container = document.getElementById(`${prefix}-antigen-antibody-selector`);
     const antigens = [];
     const antibodies = [];
@@ -154,12 +160,15 @@ export function getSelectedValues(prefix) {
         container.querySelectorAll(`[data-group="${prefix}-antigen"].selected`).forEach(btn => {
             antigens.push(btn.dataset.value);
         });
-        container.querySelectorAll(`[data-group="${prefix}-antibody"].selected`).forEach(btn => {
-            antibodies.push(btn.dataset.value);
-        });
+        
+        if (!antigensOnly) {
+            container.querySelectorAll(`[data-group="${prefix}-antibody"].selected`).forEach(btn => {
+                antibodies.push(btn.dataset.value);
+            });
+        }
     }
 
-    return { antigens, antibodies };
+    return antigensOnly ? { antigens } : { antigens, antibodies };
 }
 
 /**

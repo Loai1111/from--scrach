@@ -386,6 +386,7 @@ function renderPatientDetails(item) {
         </div>
         <div id="details-actions" class="mt-6 pt-6 border-t space-y-2">
             <button id="edit-patient-btn" class="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700">Edit Patient</button>
+            <button id="blood-test-btn" class="w-full bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 mt-2">Record Blood Test</button>
             <button id="find-match-btn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 mt-2">Find Match</button>
         </div>
     `;

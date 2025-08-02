@@ -37,12 +37,41 @@ export async function addLabTest(testData) {
 
     const newTest = {
         ...testData,
+        antigen_profile: testData.antigen_profile || [], // Include antigen information from the lab test
+        cmvStatus: testData.cmvStatus || 'Unknown', // CMV status: Positive, Negative, or Unknown
+        sickleCellStatus: testData.sickleCellStatus || 'Unknown', // Sickle Cell status: Positive, Negative, or Unknown
         createdAt: serverTimestamp()
     };
 
     const docRef = await addDoc(collection(db, 'labTests'), newTest);
     console.log(`Successfully added lab test with ID: ${docRef.id}`);
     return docRef.id;
+}
+
+/**
+ * Fetches a lab test by donor ID.
+ * @param {string} donorId - The ID of the donor.
+ * @returns {Promise<object|null>} The lab test data or null if not found.
+ */
+export async function getLabTestByDonorId(donorId) {
+    try {
+        const testsCollection = collection(db, 'labTests');
+        const q = query(testsCollection, where("donorId", "==", donorId));
+        const querySnapshot = await getDocs(q);
+        const tests = [];
+        querySnapshot.forEach((doc) => {
+            tests.push({ id: doc.id, ...doc.data() });
+        });
+        
+        // Return the most recent lab test for the donor
+        if (tests.length > 0) {
+            return tests.sort((a, b) => b.createdAt - a.createdAt)[0];
+        }
+        return null;
+    } catch (error) {
+        console.error("Error fetching lab test by donor ID:", error);
+        return null;
+    }
 }
 
 /**
@@ -66,5 +95,26 @@ export async function getAvailablePassedTests() {
     } catch (error) {
         console.error("Error fetching available passed lab tests: ", error);
         return [];
+    }
+}
+
+/**
+ * Fetches a lab test by its ID.
+ * @param {string} labTestId - The ID of the lab test.
+ * @returns {Promise<object|null>} The lab test data or null if not found.
+ */
+export async function getLabTestById(labTestId) {
+    try {
+        const labTestRef = doc(db, 'labTests', labTestId);
+        const docSnap = await getDoc(labTestRef);
+        if (docSnap.exists()) {
+            return { id: docSnap.id, ...docSnap.data() };
+        } else {
+            console.log("No such lab test document!");
+            return null;
+        }
+    } catch (error) {
+        console.error("Error fetching lab test by ID:", error);
+        return null;
     }
 }

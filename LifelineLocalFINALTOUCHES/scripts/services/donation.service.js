@@ -1,8 +1,9 @@
 import { db } from '../firebase-config.js';
-import { collection, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import { collection, getDocs, addDoc, serverTimestamp, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 import { addBloodBag } from './inventory.service.js';
 import { incrementDonationRecord } from './donor.service.js';
 import { runGlobalMatching } from './blood-match.service.js';
+import { getLabTestById } from './labTest.service.js';
 
 /**
  * Fetches all documents from the 'donations' collection.
@@ -38,11 +39,20 @@ export async function addDonation(donor, labTestId) {
         throw new Error("A labTestId is required to record a donation.");
     }
     
-    // Step 1: Create the new blood bag.
+    // Get the lab test to retrieve antigen information
+    const labTest = await getLabTestById(labTestId);
+    if (!labTest) {
+        throw new Error(`Lab test with ID ${labTestId} not found.`);
+    }
+    
+    // Step 1: Create the new blood bag with antigen information from the lab test.
     // The `addBloodBag` function will set the donatedAt timestamp.
     const newBagRef = await addBloodBag({
         donorId: donor.id,
-        bloodType: donor.bloodType
+        bloodType: donor.bloodType,
+        antigen_profile: labTest.antigen_profile || [],
+        cmvStatus: labTest.cmvStatus || 'Unknown',
+        sickleCellStatus: labTest.sickleCellStatus || 'Unknown'
     });
 
     // Step 2: Create the donation record linking to the new blood bag and the lab test.

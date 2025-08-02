@@ -176,6 +176,8 @@ function handleDetailsActionClick(e) {
     // }
     if (button.id === 'edit-patient-btn') {
         openPatientModal(true);
+    } else if (button.id === 'blood-test-btn') {
+        openPatientBloodTestModal();
     } else if (button.id === 'cancel-request-btn') {
         handleCancelRequest();
     } else if (button.id === 'find-match-btn') {
@@ -205,28 +207,9 @@ function openPatientModal(isEdit) {
         document.getElementById('patient-sex').value = patient.sex;
         document.getElementById('patient-blood-type').value = `${patient.bloodGroup}${patient.rhFactor}` || '';
 
-        // Antigen Profile
-        const antigenContainer = document.getElementById('patient-antigen-profile-container');
-        antigenContainer.innerHTML = createAntigenAntibodyUI('patient');
-        initAntigenAntibodyUI('patient');
-        setSelectedButtons('patient', patient.antigen_profile, patient.antibody_history);
-
-        // Unexpected Antibodies
-        const antibodyContainer = document.getElementById('patient-unexpected-antibodies-container');
-        antibodyContainer.innerHTML = createAntibodyButtonsUI('ua'); // ua for unexpected antibody
-        initAntibodyButtonsUI('ua');
-        setSelectedAntibodies('ua', patient.unexpectedAntibodies);
-
     } else {
        // Clear and initialize for a new patient
        document.getElementById('patient-blood-type').value = '';
-       const antigenContainer = document.getElementById('patient-antigen-profile-container');
-       antigenContainer.innerHTML = createAntigenAntibodyUI('patient');
-       initAntigenAntibodyUI('patient');
-       
-       const antibodyContainer = document.getElementById('patient-unexpected-antibodies-container');
-       antibodyContainer.innerHTML = createAntibodyButtonsUI('ua');
-       initAntibodyButtonsUI('ua');
     }
     
     document.getElementById('patient-modal').classList.remove('opacity-0', 'pointer-events-none');
@@ -262,9 +245,6 @@ async function handlePatientFormSubmit(e) {
         bloodGroup: bloodGroup,
         rhFactor: rhFactor,
         bloodType: bloodType,
-        unexpectedAntibodies: getSelectedAntibodies('ua'),
-        antigen_profile: getSelectedValues('patient').antigens,
-        antibody_history: getSelectedValues('patient').antibodies,
     };
 
     try {
@@ -459,14 +439,9 @@ async function handleFindMatch() {
         console.log('[Hospital] Fetched inventory for matching:', inventory);
         
         const patientProfileForMatching = {
-            antigenProfile: {
-                abo: patient.bloodGroup,
-                rh: patient.rhFactor,
-            },
-            antibodyHistory: {
-                expectedAntibodies: getExpectedAntibodies(patient.bloodGroup),
-                unexpectedAntibodies: patient.unexpectedAntibodies || [],
-            }
+            bloodGroup: patient.bloodGroup,
+            rhFactor: patient.rhFactor,
+            antibody_history: patient.antibody_history || [],
         };
 
         const compatibleBags = findCompatibleBloodBags(patientProfileForMatching, inventory);
@@ -477,6 +452,95 @@ async function handleFindMatch() {
         console.error("Error finding compatible blood bags:", error);
         alert(`An error occurred while finding matches: ${error.message}`);
         // ui.hideMatchLoading();
+    }
+}
+
+// --- Patient Blood Test Modal ---
+async function openPatientBloodTestModal() {
+    state.setState('selectedPatientForBloodTest', null);
+    const form = document.getElementById('patient-blood-test-form');
+    form.reset();
+
+    if (state.allPatientsCache.length === 0) {
+        state.setState('allPatientsCache', await services.patient.getPatients());
+    }
+
+    // Initialize antibody UI
+    const antibodyContainer = document.getElementById('blood-test-antibody-container');
+    antibodyContainer.innerHTML = createAntibodyButtonsUI('blood-test');
+    initAntibodyButtonsUI('blood-test');
+
+    document.getElementById('blood-test-patient-search-component').classList.remove('hidden');
+    document.getElementById('blood-test-selected-patient-display').classList.add('hidden');
+    document.getElementById('patient-blood-test-modal').classList.remove('opacity-0', 'pointer-events-none');
+}
+
+function handleBloodTestPatientSearchInput(e) {
+    const searchResults = document.getElementById('blood-test-patient-search-results');
+    const searchTerm = e.target.value.toLowerCase();
+    if (searchTerm.length < 2) {
+        searchResults.classList.add('hidden');
+        return;
+    }
+    const results = state.allPatientsCache.filter(p => p.fullName.toLowerCase().includes(searchTerm) || p.id.toLowerCase().includes(searchTerm));
+    searchResults.innerHTML = results.length > 0
+        ? results.map(p => `<div class="p-3 hover:bg-blue-50 cursor-pointer" data-patient-id="${p.id}">${p.fullName} (ID: ${p.id})</div>`).join('')
+        : `<div class="p-3 text-gray-500">No patients found.</div>`;
+    searchResults.classList.remove('hidden');
+}
+
+function handleSelectPatientForBloodTest(e) {
+    const selectedId = e.target.closest('[data-patient-id]')?.dataset.patientId;
+    if (!selectedId) return;
+    
+    const patient = state.allPatientsCache.find(p => p.id === selectedId);
+    state.setState('selectedPatientForBloodTest', patient);
+
+    document.getElementById('blood-test-selected-patient-name').textContent = patient.fullName;
+    document.getElementById('blood-test-selected-patient-info').textContent = `ID: ${patient.id} | Blood Type: ${patient.bloodType}`;
+    
+    document.getElementById('blood-test-patient-search-component').classList.add('hidden');
+    document.getElementById('blood-test-selected-patient-display').classList.remove('hidden');
+    document.getElementById('blood-test-patient-search-results').classList.add('hidden');
+}
+
+function handleClearPatientSelectionForBloodTest() {
+    state.setState('selectedPatientForBloodTest', null);
+    const searchInput = document.getElementById('blood-test-patient-search');
+    searchInput.value = '';
+    document.getElementById('blood-test-selected-patient-display').classList.add('hidden');
+    document.getElementById('blood-test-patient-search-component').classList.remove('hidden');
+    searchInput.focus();
+}
+
+async function handlePatientBloodTestFormSubmit(e) {
+    e.preventDefault();
+    const patient = state.selectedPatientForBloodTest;
+    
+    if (!patient) {
+        alert("Please select a patient for the blood test.");
+        return;
+    }
+
+    const bloodTestData = {
+        patientId: patient.id,
+        antibodies: getSelectedAntibodies('blood-test'),
+        testDate: new Date(),
+    };
+
+    try {
+        // Save the blood test results to the patient's record
+        await services.patient.updatePatient(patient.id, {
+            antibody_history: bloodTestData.antibodies,
+            lastBloodTest: bloodTestData.testDate
+        });
+        
+        alert('Patient blood test results saved successfully!');
+        document.getElementById('patient-blood-test-modal').classList.add('opacity-0', 'pointer-events-none');
+        fetchAndDisplayData();
+    } catch (error) {
+        console.error("Error saving patient blood test results:", error);
+        alert(`An error occurred: ${error.message}`);
     }
 }
 
@@ -510,6 +574,13 @@ function initializeEventListeners() {
     const today = utils.getTodayString();
     document.getElementById('patient-dob').max = today;
     document.getElementById('request-scheduled-at').min = today;
+
+    // Patient Blood Test Modal Listeners
+    document.getElementById('patient-blood-test-form').addEventListener('submit', handlePatientBloodTestFormSubmit);
+    document.getElementById('blood-test-cancel-btn').addEventListener('click', () => document.getElementById('patient-blood-test-modal').classList.add('opacity-0', 'pointer-events-none'));
+    document.getElementById('blood-test-patient-search').addEventListener('input', handleBloodTestPatientSearchInput);
+    document.getElementById('blood-test-patient-search-results').addEventListener('click', handleSelectPatientForBloodTest);
+    document.getElementById('blood-test-clear-patient-selection-btn').addEventListener('click', handleClearPatientSelectionForBloodTest);
 
     // Confirm Receipt Modal Listeners
     document.getElementById('confirm-receipt-cancel-btn').addEventListener('click', ui.hideConfirmReceiptModal);

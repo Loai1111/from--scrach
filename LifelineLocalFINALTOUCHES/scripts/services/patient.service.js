@@ -32,9 +32,9 @@ export async function getPatients() {
  * @returns {Promise<object>} A promise that resolves to the new document reference.
  */
 export async function addPatient(patientData) {
-    const { fullName, dob, sex, bloodType, rhFactor, unexpectedAntibodies } = patientData;
+    const { fullName, dob, sex, bloodGroup, rhFactor } = patientData;
 
-    if (!fullName || !dob || !sex || !bloodType) {
+    if (!fullName || !dob || !sex || !bloodGroup) {
         throw new Error("Missing required patient fields.");
     }
 
@@ -42,14 +42,11 @@ export async function addPatient(patientData) {
         fullName,
         dob,
         sex,
-        antigenProfile: {
-            abo: bloodType === 'Unknown' ? 'Unknown' : bloodType,
-            rh: rhFactor,
-        },
-        antibodyHistory: {
-            expectedAntibodies: [], // This can be populated based on blood type if needed
-            unexpectedAntibodies: unexpectedAntibodies || [],
-        },
+        bloodGroup,
+        rhFactor,
+        bloodType: `${bloodGroup}${rhFactor}`,
+        antibody_history: [], // This will be populated during blood tests
+        lastBloodTest: null, // This will be updated when blood tests are performed
         createdAt: serverTimestamp()
     };
 

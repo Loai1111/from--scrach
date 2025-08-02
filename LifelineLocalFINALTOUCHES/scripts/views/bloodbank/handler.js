@@ -333,6 +333,25 @@ function handleAddTestClick() {
             break;
         case 'lab':
             formIdToShow = 'lab-form';
+            // Initialize antigen UI for lab test
+            const container = document.getElementById('lab-antigen-container');
+            container.innerHTML = createAntigenAntibodyUI('lab', true); // true for antigens only
+            initAntigenAntibodyUI('lab', true); // true for antigens only
+            break;
+        case 'crossmatching':
+            // Show crossmatch modal and load available bags
+            const crossmatchModal = document.getElementById('crossmatch-modal');
+            const selectedTest = state.allCrossmatchesCache.find(t => t.id === state.selectedTestItemId);
+            if (selectedTest) {
+                document.getElementById('cm-request-info').textContent = `Request ${selectedTest.requestId}`;
+                // Load available blood bags for crossmatching
+                loadAvailableBloodBagsForCrossmatch(selectedTest);
+                crossmatchModal.classList.remove('opacity-0', 'pointer-events-none');
+            } else {
+                // If no test is selected, we need to create a new crossmatch request
+                // This would typically be initiated from a blood request
+                alert('Please select a blood request to initiate crossmatching.');
+            }
             break;
     }
 
@@ -340,6 +359,71 @@ function handleAddTestClick() {
         ui.showFormInModal(formIdToShow);
         ui.showTestFormModal();
     }
+}
+
+async function loadAvailableBloodBagsForCrossmatch(crossmatchRequest) {
+    const cmBagList = document.getElementById('cm-bag-list');
+    const cmSelectionCounter = document.getElementById('cm-selection-counter');
+    
+    // Clear existing list
+    cmBagList.innerHTML = '';
+    
+    // Get available blood bags that match the request requirements
+    const request = state.allRequestsCache.find(r => r.id === crossmatchRequest.requestId);
+    const patientBloodType = request ? request.bloodType : null;
+    
+    if (!patientBloodType) {
+        cmBagList.innerHTML = '<div class="p-4 text-red-500">Could not determine patient blood type for this request.</div>';
+        cmSelectionCounter.textContent = '0 / 0 selected';
+        return;
+    }
+    
+    const compatibleBags = state.allInventoryCache.filter(bag => {
+        // Check if blood type is compatible
+        const isCompatible = bloodCompatibility(bag.bloodType, patientBloodType);
+        // Check if bag is available (not already crossmatched)
+        const isAvailable = !state.allCrossmatchesCache.some(cm => cm.bloodBagId === bag.id);
+        
+        return isCompatible && isAvailable;
+    });
+    
+    if (compatibleBags.length === 0) {
+        cmBagList.innerHTML = '<div class="p-4 text-gray-500">No compatible blood bags available for this request.</div>';
+        cmSelectionCounter.textContent = '0 / 0 selected';
+        return;
+    }
+    
+    // Create checkboxes for each compatible bag
+    compatibleBags.forEach(bag => {
+        const donor = state.allDonorsCache.find(d => d.id === bag.donorId);
+        const bagElement = document.createElement('div');
+        bagElement.className = 'flex items-center p-3 border-b border-gray-200';
+        bagElement.innerHTML = `
+            <input type="checkbox" class="cm-checkbox mr-3" data-bag-id="${bag.id}" data-bag-blood-type="${bag.bloodType}">
+            <div class="flex-1">
+                <div class="font-medium">Bag ${bag.id}</div>
+                <div class="text-sm text-gray-600">Blood Type: ${bag.bloodType} | Donor: ${donor ? donor.fullName : 'Unknown'}</div>
+            </div>
+        `;
+        cmBagList.appendChild(bagElement);
+    });
+    
+    // Add event listeners to checkboxes
+    cmBagList.querySelectorAll('.cm-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+            const selectedCount = cmBagList.querySelectorAll('.cm-checkbox:checked').length;
+            const limit = crossmatchRequest.crossmatchLimit || 1;
+            cmSelectionCounter.textContent = `${selectedCount} / ${limit} selected`;
+            
+            // Disable unchecked checkboxes if limit reached
+            cmBagList.querySelectorAll('.cm-checkbox').forEach(cb => {
+                if (!cb.checked) cb.disabled = selectedCount >= limit;
+            });
+        });
+    });
+    
+    // Set initial counter
+    cmSelectionCounter.textContent = '0 / 0 selected';
 }
 
 function openDonorModal(isEdit) {
@@ -359,17 +443,12 @@ function openDonorModal(isEdit) {
         document.getElementById('donor-email').value = selectedDonor.email || '';
         document.getElementById('donor-phone').value = selectedDonor.phone || '';
         
-        const container = document.getElementById('donor-antigen-antibody-container');
-        container.innerHTML = createAntigenAntibodyUI('donor');
-        initAntigenAntibodyUI('donor');
-        setSelectedButtons('donor', selectedDonor.antigen_profile, selectedDonor.antibody_history);
+        // Antigen/antibody collection removed from donor form - now handled in lab tests
 
         document.getElementById('donor-id-display').classList.remove('hidden');
     } else {
         document.getElementById('donor-modal-title').textContent = 'Add New Donor';
-        const container = document.getElementById('donor-antigen-antibody-container');
-        container.innerHTML = createAntigenAntibodyUI('donor');
-        initAntigenAntibodyUI('donor');
+        // Antigen/antibody collection removed from donor form - now handled in lab tests
         document.getElementById('donor-id-display').classList.add('hidden');
     }
     modal.classList.remove('opacity-0', 'pointer-events-none');
@@ -387,6 +466,8 @@ function openBloodUnitModal() {
     document.getElementById('blood-unit-antigen-profile').value = (selectedUnit.antigen_profile || []).join(', ');
     document.getElementById('blood-unit-special-attributes').value = (selectedUnit.special_attributes || []).join(', ');
     document.getElementById('blood-unit-minor-antigens').value = (selectedUnit.minorAntigens || []).join(', ');
+    document.getElementById('blood-unit-cmv-status').value = selectedUnit.cmvStatus || 'Unknown';
+    document.getElementById('blood-unit-sicklecell-status').value = selectedUnit.sickleCellStatus || 'Unknown';
     document.getElementById('blood-unit-id-display').classList.remove('hidden');
     
     modal.classList.remove('opacity-0', 'pointer-events-none');
@@ -398,6 +479,8 @@ async function handleBloodUnitFormSubmit(e) {
         antigen_profile: document.getElementById('blood-unit-antigen-profile').value.split(',').map(s => s.trim()).filter(Boolean),
         special_attributes: document.getElementById('blood-unit-special-attributes').value.split(',').map(s => s.trim()).filter(Boolean),
         minorAntigens: document.getElementById('blood-unit-minor-antigens').value.split(',').map(s => s.trim()).filter(Boolean),
+        cmvStatus: document.getElementById('blood-unit-cmv-status').value,
+        sickleCellStatus: document.getElementById('blood-unit-sicklecell-status').value,
     };
 
     try {
@@ -483,8 +566,7 @@ async function handleDonorFormSubmit(e) {
         bloodType: document.getElementById('donor-blood-type').value.toUpperCase(),
         email,
         phone,
-        antigen_profile: getSelectedValues('donor').antigens,
-        antibody_history: getSelectedValues('donor').antibodies,
+        // Antigen/antibody collection removed from donor form - now handled in lab tests
     };
     try {
         if (state.isEditMode) {
@@ -903,6 +985,8 @@ async function handleLabTestSubmit(e) {
         hepatitisC: document.getElementById('l-hep-c').value,
         hivAids: document.getElementById('l-aids').value,
     };
+    const cmvStatus = document.getElementById('l-cmv-status').value;
+    const sickleCellStatus = document.getElementById('l-sicklecell-status').value;
 
     let disqualificationType = 'None';
     let issues = [];
@@ -934,6 +1018,9 @@ async function handleLabTestSubmit(e) {
                 hematocrit,
             },
             viralMarkers,
+            antigenProfile: getSelectedValues('lab').antigens, // Add antigen profile from lab test
+            cmvStatus: cmvStatus,
+            sickleCellStatus: sickleCellStatus,
             result,
         });
 
@@ -1015,6 +1102,41 @@ function initializeEventListeners() {
             commentsTextarea.disabled = true;
             commentsTextarea.value = '';
             commentsTextarea.classList.add('bg-gray-100');
+        }
+    });
+    
+    // Crossmatch Modal Event Listeners
+    document.getElementById('cm-cancel-btn').addEventListener('click', () => {
+        document.getElementById('crossmatch-modal').classList.add('opacity-0', 'pointer-events-none');
+    });
+    
+    document.getElementById('cm-submit-btn').addEventListener('click', async () => {
+        const selectedCheckboxes = document.querySelectorAll('.cm-checkbox:checked');
+        const selectedBagIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.bagId);
+        
+        if (selectedBagIds.length === 0) {
+            alert('Please select at least one blood bag for crossmatching.');
+            return;
+        }
+        
+        const selectedTest = state.allCrossmatchesCache.find(t => t.id === state.selectedTestItemId);
+        const limit = selectedTest.crossmatchLimit || 1;
+        
+        if (selectedBagIds.length > limit) {
+            alert(`You can select a maximum of ${limit} blood bag(s) for this crossmatch.`);
+            return;
+        }
+        
+        try {
+            for (const bagId of selectedBagIds) {
+                await services.crossmatch.addCrossmatch(selectedTest.requestId, bagId);
+            }
+            alert(`Successfully added ${selectedBagIds.length} crossmatch test(s).`);
+            document.getElementById('crossmatch-modal').classList.add('opacity-0', 'pointer-events-none');
+            fetchAndDisplayData();
+        } catch (error) {
+            console.error('Error adding crossmatch:', error);
+            alert('An error occurred while adding crossmatch tests.');
         }
     });
 }

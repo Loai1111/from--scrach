@@ -6,22 +6,27 @@ import { doc, updateDoc, collection, query, where, getDocs, writeBatch, serverTi
 import { db } from "../firebase-config.js";
 import { getAvailableBloodBags, updateMultipleBagStatuses } from "./inventory.service.js";
 import { getPatientById } from "./patient.service.js";
+import { getLabTestByDonorId } from "./labTest.service.js";
 import { bloodCompatibility } from '../utils.js';
 import { rankingService } from './ranking.service.js';
 import { createNotification } from './notification.service.js';
 import { updateRequestAfterMatching } from './request.service.js';
 
 /**
- * Checks if a donor's blood is compatible with a recipient's blood based on ABO/Rh and alloantibodies.
+ * Checks if a donor's blood is compatible with a recipient's blood based on ABO/Rh, alloantibodies, CMV status, and Sickle Cell status.
  *
  * @param {object} recipient - The recipient's blood profile.
  * @param {string} recipient.abo - The recipient's ABO blood type.
  * @param {string} recipient.rh - The recipient's Rh factor.
  * @param {string[]} [recipient.unexpectedAntibodies] - A list of the recipient's unexpected antibodies.
+ * @param {boolean} [recipient.requiresCmvNegative] - Whether the recipient requires CMV negative blood.
+ * @param {boolean} [recipient.requiresSickleCellNegative] - Whether the recipient requires Sickle Cell negative blood.
  * @param {object} donor - The donor's blood profile.
  * @param {string} donor.abo - The donor's ABO blood type.
  * @param {string} donor.rh - The donor's Rh factor.
  * @param {string[]} [donor.minorAntigens] - A list of the donor's minor antigens.
+ * @param {string} [donor.cmvStatus] - The donor's CMV status ("Positive", "Negative", or "Unknown").
+ * @param {string} [donor.sickleCellStatus] - The donor's Sickle Cell status ("Positive", "Negative", or "Unknown").
  * @returns {boolean} - True if the blood is compatible, false otherwise.
  */
 export function isCompatible(recipient, donor) {
@@ -61,6 +66,54 @@ export function isCompatible(recipient, donor) {
         }
     }
 
+    // CMV compatibility
+    if (recipient.requiresCmvNegative) {
+        if (!donor.cmvStatus) {
+            console.warn('CMV status is missing for donor - assuming incompatible for CMV negative requirement');
+            return false;
+        }
+        
+        // Normalize CMV status to handle case variations
+        const normalizedCmvStatus = donor.cmvStatus.toLowerCase().trim();
+        
+        if (normalizedCmvStatus === 'negative') {
+            // Compatible - donor is CMV negative
+            console.log('CMV compatibility check passed: Donor is CMV negative');
+        } else if (normalizedCmvStatus === 'positive' || normalizedCmvStatus === 'unknown') {
+            // Incompatible - donor is either CMV positive or status is unknown
+            console.log(`CMV compatibility check failed: Donor is ${donor.cmvStatus}, but recipient requires CMV negative`);
+            return false;
+        } else {
+            // Handle unexpected CMV status values
+            console.warn(`Unexpected CMV status value: ${donor.cmvStatus} - assuming incompatible for CMV negative requirement`);
+            return false;
+        }
+    }
+
+    // Sickle Cell compatibility
+    if (recipient.requiresSickleCellNegative) {
+        if (!donor.sickleCellStatus) {
+            console.warn('Sickle Cell status is missing for donor - assuming incompatible for Sickle Cell negative requirement');
+            return false;
+        }
+        
+        // Normalize Sickle Cell status to handle case variations
+        const normalizedSickleCellStatus = donor.sickleCellStatus.toLowerCase().trim();
+        
+        if (normalizedSickleCellStatus === 'negative') {
+            // Compatible - donor is Sickle Cell negative
+            console.log('Sickle Cell compatibility check passed: Donor is Sickle Cell negative');
+        } else if (normalizedSickleCellStatus === 'positive' || normalizedSickleCellStatus === 'unknown') {
+            // Incompatible - donor is either Sickle Cell positive or status is unknown
+            console.log(`Sickle Cell compatibility check failed: Donor is ${donor.sickleCellStatus}, but recipient requires Sickle Cell negative`);
+            return false;
+        } else {
+            // Handle unexpected Sickle Cell status values
+            console.warn(`Unexpected Sickle Cell status value: ${donor.sickleCellStatus} - assuming incompatible for Sickle Cell negative requirement`);
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -93,22 +146,26 @@ export function isCompatible(recipient, donor) {
  * @param {string[]} [bloodBags[].donor.antigenProfile.minorAntigens] - Minor antigens present on the red cells of the donor (e.g., ["K"]).
  * @returns {Array<object>} An array of blood bags that are compatible with the patient.
  */
-export function findCompatibleBloodBags(patient, bloodBags) {
+export function findCompatibleBloodBags(patient, bloodBags, specialRequirements = []) {
     const recipientProfile = {
-        abo: patient.antigenProfile.abo,
-        rh: patient.antigenProfile.rh,
-        unexpectedAntibodies: patient.antibodyHistory.unexpectedAntibodies || [],
+        abo: patient.bloodGroup,
+        rh: patient.rhFactor,
+        unexpectedAntibodies: patient.antibody_history || [],
+        requiresCmvNegative: specialRequirements.includes('CMV Negative'),
+        requiresSickleCellNegative: specialRequirements.includes('Sickle Cell Negative'),
     };
 
     return bloodBags.filter(bag => {
-        if (!bag.donor || !bag.donor.antigenProfile) {
+        if (!bag.donorId) {
             return false;
         }
 
         const donorProfile = {
-            abo: bag.donor.antigenProfile.abo,
-            rh: bag.donor.antigenProfile.rh,
-            minorAntigens: bag.donor.antigenProfile.minorAntigens || [],
+            abo: bag.bloodType ? bag.bloodType.slice(0, -1) : 'Unknown',
+            rh: bag.bloodType ? bag.bloodType.slice(-1) : '-',
+            minorAntigens: bag.antigen_profile || [],
+            cmvStatus: bag.cmvStatus || 'Unknown',
+            sickleCellStatus: bag.sickleCellStatus || 'Unknown',
         };
 
         return isCompatible(recipientProfile, donorProfile);
@@ -181,44 +238,25 @@ export async function runGlobalMatching() {
         if (request.bloodType === 'Any' || request.bloodType === 'Unknown') {
             compatibleUnits = availableUnits.filter(unit => unit.bloodType === 'O-');
         } else {
-            compatibleUnits = availableUnits.filter((unit, index) => {
+            // Use the findCompatibleBloodBags function which now includes CMV compatibility checking
+            compatibleUnits = findCompatibleBloodBags(patient, availableUnits, request.specialRequirements || []);
+            
+            // Additional filtering for failed units and other special requirements
+            compatibleUnits = compatibleUnits.filter((unit, index) => {
                 if (index === 0) { // Log only for the first unit to avoid spamming
-                    console.log(`--- Checking compatibility for Request ${request.id} ---`);
+                    console.log(`--- Checking additional compatibility for Request ${request.id} ---`);
                     console.log("Patient Data:", JSON.stringify(patient, null, 2));
                     console.log("Unit Data:", JSON.stringify(unit, null, 2));
                 }
-
-                const patientBloodType = patient?.bloodType;
-                const patientAntibodies = patient?.unexpectedAntibodies || [];
-
-                if (!patientBloodType) {
-                    console.error(`Could not determine blood type for patient ${patient.id}`);
-                    return false;
-                }
-
-                const isCompatibleType = (bloodCompatibility[patientBloodType] || []).includes(unit.bloodType);
-                if (!isCompatibleType) {
-                    if (index === 0) console.log(`Compatibility Fail: ABO/Rh incompatibility. Patient ${patientBloodType} cannot receive ${unit.bloodType}.`);
-                    return false;
-                }
+                
                 if (patient.failedUnits?.includes(unit.id)) {
                     if (index === 0) console.log(`Compatibility Fail: Unit ${unit.id} is in patient's failed units list.`);
                     return false;
                 }
 
-                if (patientAntibodies.length > 0) {
-                    const hasIncompatibleAntigen = patientAntibodies.some(antibody => {
-                        const antigen = antibody.replace('Anti-', '');
-                        const isIncompatible = unit.antigen_profile?.includes(antigen);
-                        if (isIncompatible && index === 0) {
-                            console.log(`Compatibility Fail: Patient has ${antibody}, and unit has antigen ${antigen}.`);
-                        }
-                        return isIncompatible;
-                    });
-                    if (hasIncompatibleAntigen) return false;
-                }
-
-                const meetsSpecialRequirements = request.specialRequirements?.every(req => unit.special_attributes?.includes(req)) ?? true;
+                const meetsSpecialRequirements = request.specialRequirements?.every(req =>
+                    req === 'CMV Negative' || req === 'Sickle Cell Negative' || unit.special_attributes?.includes(req)
+                ) ?? true;
                 if (!meetsSpecialRequirements && index === 0) {
                     console.log(`Compatibility Fail: Unit does not meet special requirements.`);
                 }
@@ -319,4 +357,240 @@ export async function runGlobalMatching() {
 
     await batch.commit();
     console.log("Global Matching Run finished.");
+}
+
+/**
+ * Tests the CMV Negative filter implementation with various scenarios.
+ * This function can be called to verify that the CMV compatibility logic works correctly.
+ *
+ * @returns {object} Test results with pass/fail status for each test case
+ */
+export function testCmvNegativeFilter() {
+    console.log("Testing CMV Negative filter implementation...");
+    
+    const testCases = [
+        {
+            name: "Recipient requires CMV negative, donor is CMV negative",
+            recipient: { abo: 'A', rh: '+', requiresCmvNegative: true },
+            donor: { abo: 'A', rh: '+', cmvStatus: 'Negative' },
+            expected: true
+        },
+        {
+            name: "Recipient requires CMV negative, donor is CMV positive",
+            recipient: { abo: 'A', rh: '+', requiresCmvNegative: true },
+            donor: { abo: 'A', rh: '+', cmvStatus: 'Positive' },
+            expected: false
+        },
+        {
+            name: "Recipient requires CMV negative, donor has unknown CMV status",
+            recipient: { abo: 'A', rh: '+', requiresCmvNegative: true },
+            donor: { abo: 'A', rh: '+', cmvStatus: 'Unknown' },
+            expected: false
+        },
+        {
+            name: "Recipient requires CMV negative, donor has missing CMV status",
+            recipient: { abo: 'A', rh: '+', requiresCmvNegative: true },
+            donor: { abo: 'A', rh: '+', cmvStatus: undefined },
+            expected: false
+        },
+        {
+            name: "Recipient does not require CMV negative, donor is CMV positive",
+            recipient: { abo: 'A', rh: '+', requiresCmvNegative: false },
+            donor: { abo: 'A', rh: '+', cmvStatus: 'Positive' },
+            expected: true
+        },
+        {
+            name: "Recipient does not require CMV negative, donor has unknown CMV status",
+            recipient: { abo: 'A', rh: '+', requiresCmvNegative: false },
+            donor: { abo: 'A', rh: '+', cmvStatus: 'Unknown' },
+            expected: true
+        },
+        {
+            name: "CMV status case sensitivity test (lowercase)",
+            recipient: { abo: 'A', rh: '+', requiresCmvNegative: true },
+            donor: { abo: 'A', rh: '+', cmvStatus: 'negative' },
+            expected: true
+        },
+        {
+            name: "CMV status case sensitivity test (uppercase)",
+            recipient: { abo: 'A', rh: '+', requiresCmvNegative: true },
+            donor: { abo: 'A', rh: '+', cmvStatus: 'NEGATIVE' },
+            expected: true
+        },
+        {
+            name: "Unexpected CMV status value",
+            recipient: { abo: 'A', rh: '+', requiresCmvNegative: true },
+            donor: { abo: 'A', rh: '+', cmvStatus: 'InvalidValue' },
+            expected: false
+        }
+    ];
+    
+    const results = {
+        passed: 0,
+        failed: 0,
+        details: []
+    };
+    
+    testCases.forEach(testCase => {
+        try {
+            const actual = isCompatible(testCase.recipient, testCase.donor);
+            const passed = actual === testCase.expected;
+            
+            if (passed) {
+                results.passed++;
+                console.log(`✓ PASS: ${testCase.name}`);
+            } else {
+                results.failed++;
+                console.error(`✗ FAIL: ${testCase.name} - Expected ${testCase.expected}, got ${actual}`);
+            }
+            
+            results.details.push({
+                name: testCase.name,
+                passed: passed,
+                expected: testCase.expected,
+                actual: actual
+            });
+        } catch (error) {
+            results.failed++;
+            console.error(`✗ ERROR: ${testCase.name} - ${error.message}`);
+            results.details.push({
+                name: testCase.name,
+                passed: false,
+                error: error.message
+            });
+        }
+    });
+    
+    console.log(`\nCMV Negative Filter Test Results:`);
+    console.log(`Passed: ${results.passed}/${testCases.length}`);
+    console.log(`Failed: ${results.failed}/${testCases.length}`);
+    
+    return results;
+}
+
+/**
+ * Tests the Sickle Cell Negative filter implementation with various scenarios.
+ * This function can be called to verify that the Sickle Cell compatibility logic works correctly.
+ *
+ * @returns {object} Test results with pass/fail status for each test case
+ */
+export function testSickleCellNegativeFilter() {
+    console.log("Testing Sickle Cell Negative filter implementation...");
+    
+    const testCases = [
+        {
+            name: "Recipient requires Sickle Cell negative, donor is Sickle Cell negative",
+            recipient: { abo: 'A', rh: '+', requiresSickleCellNegative: true },
+            donor: { abo: 'A', rh: '+', sickleCellStatus: 'Negative' },
+            expected: true
+        },
+        {
+            name: "Recipient requires Sickle Cell negative, donor is Sickle Cell positive",
+            recipient: { abo: 'A', rh: '+', requiresSickleCellNegative: true },
+            donor: { abo: 'A', rh: '+', sickleCellStatus: 'Positive' },
+            expected: false
+        },
+        {
+            name: "Recipient requires Sickle Cell negative, donor has unknown Sickle Cell status",
+            recipient: { abo: 'A', rh: '+', requiresSickleCellNegative: true },
+            donor: { abo: 'A', rh: '+', sickleCellStatus: 'Unknown' },
+            expected: false
+        },
+        {
+            name: "Recipient requires Sickle Cell negative, donor has missing Sickle Cell status",
+            recipient: { abo: 'A', rh: '+', requiresSickleCellNegative: true },
+            donor: { abo: 'A', rh: '+', sickleCellStatus: undefined },
+            expected: false
+        },
+        {
+            name: "Recipient does not require Sickle Cell negative, donor is Sickle Cell positive",
+            recipient: { abo: 'A', rh: '+', requiresSickleCellNegative: false },
+            donor: { abo: 'A', rh: '+', sickleCellStatus: 'Positive' },
+            expected: true
+        },
+        {
+            name: "Recipient does not require Sickle Cell negative, donor has unknown Sickle Cell status",
+            recipient: { abo: 'A', rh: '+', requiresSickleCellNegative: false },
+            donor: { abo: 'A', rh: '+', sickleCellStatus: 'Unknown' },
+            expected: true
+        },
+        {
+            name: "Sickle Cell status case sensitivity test (lowercase)",
+            recipient: { abo: 'A', rh: '+', requiresSickleCellNegative: true },
+            donor: { abo: 'A', rh: '+', sickleCellStatus: 'negative' },
+            expected: true
+        },
+        {
+            name: "Sickle Cell status case sensitivity test (uppercase)",
+            recipient: { abo: 'A', rh: '+', requiresSickleCellNegative: true },
+            donor: { abo: 'A', rh: '+', sickleCellStatus: 'NEGATIVE' },
+            expected: true
+        },
+        {
+            name: "Unexpected Sickle Cell status value",
+            recipient: { abo: 'A', rh: '+', requiresSickleCellNegative: true },
+            donor: { abo: 'A', rh: '+', sickleCellStatus: 'InvalidValue' },
+            expected: false
+        },
+        {
+            name: "Combined CMV and Sickle Cell requirements - both negative",
+            recipient: { abo: 'A', rh: '+', requiresCmvNegative: true, requiresSickleCellNegative: true },
+            donor: { abo: 'A', rh: '+', cmvStatus: 'Negative', sickleCellStatus: 'Negative' },
+            expected: true
+        },
+        {
+            name: "Combined CMV and Sickle Cell requirements - CMV positive, Sickle Cell negative",
+            recipient: { abo: 'A', rh: '+', requiresCmvNegative: true, requiresSickleCellNegative: true },
+            donor: { abo: 'A', rh: '+', cmvStatus: 'Positive', sickleCellStatus: 'Negative' },
+            expected: false
+        },
+        {
+            name: "Combined CMV and Sickle Cell requirements - CMV negative, Sickle Cell positive",
+            recipient: { abo: 'A', rh: '+', requiresCmvNegative: true, requiresSickleCellNegative: true },
+            donor: { abo: 'A', rh: '+', cmvStatus: 'Negative', sickleCellStatus: 'Positive' },
+            expected: false
+        }
+    ];
+    
+    const results = {
+        passed: 0,
+        failed: 0,
+        details: []
+    };
+    
+    testCases.forEach(testCase => {
+        try {
+            const actual = isCompatible(testCase.recipient, testCase.donor);
+            const passed = actual === testCase.expected;
+            
+            if (passed) {
+                results.passed++;
+                console.log(`✓ PASS: ${testCase.name}`);
+            } else {
+                results.failed++;
+                console.error(`✗ FAIL: ${testCase.name} - Expected ${testCase.expected}, got ${actual}`);
+            }
+            
+            results.details.push({
+                name: testCase.name,
+                passed: passed,
+                expected: testCase.expected,
+                actual: actual
+            });
+        } catch (error) {
+            results.failed++;
+            console.error(`✗ ERROR: ${testCase.name} - ${error.message}`);
+            results.details.push({
+                name: testCase.name,
+                passed: false,
+                error: error.message
+            });
+        }
+    });
+    
+    console.log(`\nSickle Cell Negative Filter Test Results:`);
+    console.log(`Passed: ${results.passed}/${testCases.length}`);
+    console.log(`Failed: ${results.failed}/${testCases.length}`);
+    
+    return results;
 }

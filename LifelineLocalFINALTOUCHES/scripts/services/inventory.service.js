@@ -87,7 +87,9 @@ export async function addBloodBag(bagData) {
         donatedAt: serverTimestamp(),
         expiryDate: expiryDate, // Storing as a JS Date, Firestore will convert it
         antigen_profile: bagData.antigen_profile || [],
-        special_attributes: bagData.special_attributes || []
+        special_attributes: bagData.special_attributes || [],
+        cmvStatus: bagData.cmvStatus || 'Unknown', // CMV status: Positive, Negative, or Unknown
+        sickleCellStatus: bagData.sickleCellStatus || 'Unknown' // Sickle Cell status: Positive, Negative, or Unknown
     };
     const docRef = await addDoc(collection(db, 'bloodbags'), newBagData);
     console.log(`Successfully added blood bag with auto-generated ID: ${docRef.id}`);

@@ -223,6 +223,24 @@
                     <label for="blood-unit-minor-antigens" class="block text-sm font-medium text-gray-700">Minor Antigens (comma-separated)</label>
                     <input type="text" id="blood-unit-minor-antigens" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="e.g., K, Fya, Jka">
                 </div>
+                
+                <div>
+                    <label for="blood-unit-cmv-status" class="block text-sm font-medium text-gray-700">CMV Status</label>
+                    <select id="blood-unit-cmv-status" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        <option value="Unknown">Unknown</option>
+                        <option value="Positive">Positive</option>
+                        <option value="Negative">Negative</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="blood-unit-sicklecell-status" class="block text-sm font-medium text-gray-700">Sickle Cell Status</label>
+                    <select id="blood-unit-sicklecell-status" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        <option value="Unknown">Unknown</option>
+                        <option value="Positive">Positive</option>
+                        <option value="Negative">Negative</option>
+                    </select>
+                </div>
 
                 <div class="flex justify-end space-x-4 pt-4"><button type="button" id="blood-unit-cancel-btn" class="bg-gray-200 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-300">Cancel</button><button type="submit" class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700">Save Details</button></div>
             </form>
@@ -400,13 +418,30 @@
                         </div>
                     </div>
 
+                    <!-- Antigen Profile -->
+                    <div class="form-section p-4 bg-gray-50 rounded-lg">
+                        <h4 class="font-semibold text-gray-700 mb-4">Step 3: Antigen Profile</h4>
+                        <div id="lab-antigen-container">
+                            <!-- Antigen UI will be rendered here by handler.js -->
+                        </div>
+                    </div>
+
                     <!-- Viral Markers -->
                     <div class="form-section p-4 bg-gray-50 rounded-lg">
-                        <h4 class="font-semibold text-gray-700 mb-4">Step 3: Viral Marker Tests</h4>
+                        <h4 class="font-semibold text-gray-700 mb-4">Step 4: Viral Marker Tests</h4>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div><label for="l-hep-b" class="block text-sm font-medium text-gray-700">Hepatitis B</label><select id="l-hep-b" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg" required><option value="">Select...</option><option>Positive</option><option>Negative</option></select></div>
                             <div><label for="l-hep-c" class="block text-sm font-medium text-gray-700">Hepatitis C</label><select id="l-hep-c" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg" required><option value="">Select...</option><option>Positive</option><option>Negative</option></select></div>
                             <div><label for="l-aids" class="block text-sm font-medium text-gray-700">HIV/AIDS</label><select id="l-aids" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg" required><option value="">Select...</option><option>Positive</option><option>Negative</option></select></div>
+                        </div>
+                    </div>
+
+                    <!-- Special Status Markers -->
+                    <div class="form-section p-4 bg-gray-50 rounded-lg">
+                        <h4 class="font-semibold text-gray-700 mb-4">Step 5: Special Status Markers</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div><label for="l-cmv-status" class="block text-sm font-medium text-gray-700">CMV Status</label><select id="l-cmv-status" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg" required><option value="Unknown">Unknown</option><option>Positive</option><option>Negative</option></select></div>
+                            <div><label for="l-sicklecell-status" class="block text-sm font-medium text-gray-700">Sickle Cell Status</label><select id="l-sicklecell-status" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg" required><option value="Unknown">Unknown</option><option>Positive</option><option>Negative</option></select></div>
                         </div>
                     </div>
 

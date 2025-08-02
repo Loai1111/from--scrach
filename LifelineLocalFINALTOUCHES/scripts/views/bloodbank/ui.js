@@ -160,8 +160,9 @@ export function switchTestTabUI(tab) {
     if (testsTabContents[tab]) testsTabContents[tab].classList.remove('hidden');
     
     const isCrossmatch = tab === 'crossmatching';
-    addTestBtn.disabled = isCrossmatch;
-    addTestBtn.title = isCrossmatch ? 'Crossmatching is initiated from a blood request' : 'Add New Test';
+    // Don't disable the button for crossmatching - the handler will manage the behavior
+    addTestBtn.disabled = false;
+    addTestBtn.title = isCrossmatch ? 'Add Crossmatching Test' : 'Add New Test';
 }
 
 export function updatePageActionsUI(addHandler) {
@@ -557,6 +558,8 @@ async function renderDetailsPanel() {
                     <p><strong>Blood Type:</strong> ${selectedItem.bloodType}</p>
                     <p><strong>Status:</strong> ${getStatusBadge(selectedItem.status)}</p>
                     <p><strong>Donation Date:</strong> ${safeFormatDate(selectedItem.donatedAt)}</p>
+                    <p><strong>CMV Status:</strong> ${selectedItem.cmvStatus ? getStatusBadge(selectedItem.cmvStatus === 'Negative' ? 'Pass' : 'Fail') : 'N/A'}</p>
+                    <p><strong>Sickle Cell Status:</strong> ${selectedItem.sickleCellStatus ? getStatusBadge(selectedItem.sickleCellStatus === 'Negative' ? 'Pass' : 'Fail') : 'N/A'}</p>
                     <p><strong>Antigen Profile:</strong> ${(selectedItem.antigen_profile || []).join(', ') || 'N/A'}</p>
                     <p><strong>Special Attributes:</strong> ${(selectedItem.special_attributes || []).join(', ') || 'N/A'}</p>
                     <p><strong>Minor Antigens:</strong> ${(selectedItem.minorAntigens || []).join(', ') || 'N/A'}</p>
