@@ -1,56 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lifeline/providers/auth_provider.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lifeline/providers/donor_provider.dart';
 
 class Profile extends ConsumerWidget {
-  const Profile({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userAsyncValue = ref.watch(userProvider);
+    final userProfileAsync = ref.watch(userProvider);
+    final donorProfileAsync = ref.watch(donorProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        centerTitle: true,
-        backgroundColor: Colors.red[800],
-      ),
-      body: userAsyncValue.when(
-        data: (user) {
-          if (user == null) {
-            return const Center(child: Text('No user logged in.'));
+      appBar: AppBar(title: const Text('Profile')),
+      body: userProfileAsync.when(
+        data: (userProfile) {
+          if (userProfile == null) {
+            return Center(child: Text('Not logged in'));
           }
-          return Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Colors.red[800],
-                  child: const Icon(
-                    LucideIcons.user,
-                    color: Colors.white,
-                    size: 50,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text('Name: ${user.name}'),
-                Text('Email: ${user.email}'),
-                Text('Blood Type: ${user.bloodType}'),
-                Text('Sex: ${user.sex}'),
-                const SizedBox(height: 30),
-                ListTile(
-                  leading: const Icon(LucideIcons.logOut),
-                  title: const Text('Logout'),
-                  onTap: () => ref.read(authRepositoryProvider).signOut(),
-                ),
-              ],
-            ),
+          return donorProfileAsync.when(
+            data: (donorProfile) {
+              if (donorProfile == null) {
+                return Center(child: Text('Donor details not found.'));
+              }
+              // Build UI using data from both userProfile and donorProfile
+              return ListView(
+                padding: const EdgeInsets.all(16.0),
+                children: [
+                  Text('Name: ${userProfile.name}'),
+                  Text('Email: ${userProfile.email}'),
+                  Text('Role: ${userProfile.role}'),
+                  Text('Blood Type: ${donorProfile.bloodType}'),
+                  Text('Sex: ${donorProfile.sex}'),
+                  Text('Date of Birth: ${donorProfile.dob}'),
+                  Text('Total Donations: ${donorProfile.donationRecord}'),
+                  Text('Disqualification Status: ${donorProfile.disqualificationStatus}'),
+                ],
+              );
+            },
+            loading: () => Center(child: CircularProgressIndicator()),
+            error: (err, stack) => Center(child: Text('Error loading donor profile')),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
+        loading: () => Center(child: CircularProgressIndicator()),
+        error: (err, stack) => Center(child: Text('Error loading user profile')),
       ),
     );
   }

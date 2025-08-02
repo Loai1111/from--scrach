@@ -25,7 +25,8 @@ class Bloodinventory extends ConsumerWidget {
               return Card(
                 margin: const EdgeInsets.all(8.0),
                 child: ListTile(
-                  title: Text('Blood Type: ${data[index].bloodType}'),
+                  title: Text('Donor: ${data[index].donorName ?? 'Unknown'}'),
+                  subtitle: Text('Blood Type: ${data[index].bloodType}'),
                 ),
               );
             },

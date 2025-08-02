@@ -13,7 +13,7 @@ class EligibilityPage extends ConsumerStatefulWidget {
 
 class _EligibilityPageState extends ConsumerState<EligibilityPage> {
   final _formKey = GlobalKey<FormState>();
-  final Map<String, bool> _answers = {};
+  final Map<String, bool?> _answers = {};
   final _nationalIdController = TextEditingController();
   final _addressController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -27,11 +27,23 @@ class _EligibilityPageState extends ConsumerState<EligibilityPage> {
   }
 
   void _submitForm() async {
+    final questions = ref.read(eligibilityQuestionsProvider);
+    final allAnswered = questions.every((q) => _answers[q.id] != null);
+
+    if (!allAnswered) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please answer all questions.')),
+      );
+      return;
+    }
+
     if (_formKey.currentState!.validate()) {
+      final finalAnswers =
+          _answers.map((key, value) => MapEntry(key, value!));
       final result = await ref
           .read(eligibilityNotifierProvider.notifier)
           .processAndSubmitQuestionnaire(
-            _answers,
+            finalAnswers,
             nationalId: _nationalIdController.text,
             address: _addressController.text,
             phone: _phoneController.text,
@@ -113,7 +125,6 @@ class _EligibilityPageState extends ConsumerState<EligibilityPage> {
                       itemCount: questions.length,
                       itemBuilder: (context, index) {
                         final question = questions[index];
-                        _answers.putIfAbsent(question.id, () => false);
                         return _buildQuestion(question);
                       },
                     ),
@@ -173,16 +184,16 @@ class _EligibilityPageState extends ConsumerState<EligibilityPage> {
             Text(question.text, style: const TextStyle(fontSize: 16)),
             Row(
               children: [
-                Radio<bool>(
+                Radio<bool?>(
                   value: true,
                   groupValue: _answers[question.id],
-                  onChanged: (val) => setState(() => _answers[question.id] = val!),
+                  onChanged: (val) => setState(() => _answers[question.id] = val),
                 ),
                 const Text('Yes'),
-                Radio<bool>(
+                Radio<bool?>(
                   value: false,
                   groupValue: _answers[question.id],
-                  onChanged: (val) => setState(() => _answers[question.id] = val!),
+                  onChanged: (val) => setState(() => _answers[question.id] = val),
                 ),
                 const Text('No'),
               ],

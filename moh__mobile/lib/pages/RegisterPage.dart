@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lifeline/providers/auth_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart'; // Add intl package to pubspec.yaml
 
 class Register extends ConsumerStatefulWidget {
   const Register({super.key});
@@ -17,12 +18,15 @@ class _RegisterState extends ConsumerState<Register> {
   final _passwordController = TextEditingController();
   String? _selectedBloodType;
   String? _selectedSex;
+  DateTime? _selectedDate;
 
   final List<String> _bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   final List<String> _sexes = ['Male', 'Female'];
 
   Future<void> _register() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _selectedDate == null) return;
+
+    final dobString = DateFormat('yyyy-MM-dd').format(_selectedDate!);
 
     try {
       await ref.read(authRepositoryProvider).register(
@@ -31,12 +35,27 @@ class _RegisterState extends ConsumerState<Register> {
             name: _nameController.text,
             bloodType: _selectedBloodType!,
             sex: _selectedSex!,
+            dob: dobString, // Pass as a formatted string
           );
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? 'Registration failed')),
       );
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+      });
     }
   }
 
@@ -79,6 +98,21 @@ class _RegisterState extends ConsumerState<Register> {
                 items: _sexes.map((sex) => DropdownMenuItem(value: sex, child: Text(sex))).toList(),
                 onChanged: (value) => setState(() => _selectedSex = value),
                 validator: (value) => value == null ? 'Select your sex' : null,
+              ),
+              TextFormField(
+                decoration: const InputDecoration(
+                  labelText: 'Birthday',
+                  suffixIcon: Icon(Icons.calendar_today),
+                ),
+                readOnly: true,
+                controller: TextEditingController(
+                  text: _selectedDate == null
+                      ? ''
+                      : "${_selectedDate!.toLocal()}".split(' ')[0],
+                ),
+                onTap: () => _selectDate(context),
+                validator: (value) =>
+                    _selectedDate == null ? 'Please select your birthday' : null,
               ),
               const SizedBox(height: 20),
               ElevatedButton(

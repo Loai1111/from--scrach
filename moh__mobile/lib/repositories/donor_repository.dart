@@ -36,4 +36,40 @@ class DonorRepository {
       throw Exception('Failed to update donor');
     }
   }
+
+  Future<Donor?> getDonorProfile(String uid) async {
+    try {
+      final querySnapshot =
+          await _donorsCollection.where('userId', isEqualTo: uid).limit(1).get();
+      if (querySnapshot.docs.isNotEmpty) {
+        return Donor.fromFirestore(querySnapshot.docs.first);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting donor profile: $e');
+      throw Exception('Failed to get donor profile');
+    }
+  }
+  Future<void> incrementDonationRecord(String donorId) async {
+    try {
+      await _donorsCollection.doc(donorId).update({
+        'donationRecord': FieldValue.increment(1),
+      });
+    } catch (e) {
+      print('Error incrementing donation record: $e');
+      throw Exception('Failed to increment donation record');
+    }
+  }
+
+  Future<void> updateDonorDisqualificationStatus(
+      String donorId, String status) async {
+    try {
+      await _donorsCollection.doc(donorId).update({
+        'disqualificationStatus': status,
+      });
+    } catch (e) {
+      print('Error updating donor disqualification status: $e');
+      throw Exception('Failed to update donor disqualification status');
+    }
+  }
 }

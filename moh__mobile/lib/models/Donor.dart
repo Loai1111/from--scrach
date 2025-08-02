@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class Donor {
   final String id;
   final String fullName;
-  final DateTime dob;
+  final String dob; // Changed to String
   final String sex;
   final String bloodType;
   final String? email;
@@ -12,6 +12,7 @@ class Donor {
   final String disqualificationStatus;
   final int donationRecord;
   final DateTime createdAt;
+  final DateTime? birthday;
 
   Donor({
     required this.id,
@@ -25,12 +26,13 @@ class Donor {
     required this.disqualificationStatus,
     required this.donationRecord,
     required this.createdAt,
+    this.birthday,
   });
 
   Donor copyWith({
     String? id,
     String? fullName,
-    DateTime? dob,
+    String? dob, // Changed to String
     String? sex,
     String? bloodType,
     String? email,
@@ -39,6 +41,7 @@ class Donor {
     String? disqualificationStatus,
     int? donationRecord,
     DateTime? createdAt,
+    DateTime? birthday,
   }) {
     return Donor(
       id: id ?? this.id,
@@ -52,13 +55,14 @@ class Donor {
       disqualificationStatus: disqualificationStatus ?? this.disqualificationStatus,
       donationRecord: donationRecord ?? this.donationRecord,
       createdAt: createdAt ?? this.createdAt,
+      birthday: birthday ?? this.birthday,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'fullName': fullName,
-      'dob': Timestamp.fromDate(dob),
+      'dob': dob, // Stored as String
       'sex': sex,
       'bloodType': bloodType,
       'email': email,
@@ -67,6 +71,7 @@ class Donor {
       'disqualificationStatus': disqualificationStatus,
       'donationRecord': donationRecord,
       'createdAt': Timestamp.fromDate(createdAt),
+      'birthday': birthday?.toIso8601String(),
     };
   }
 
@@ -74,7 +79,7 @@ class Donor {
     return Donor(
       id: json['id'],
       fullName: json['fullName'],
-      dob: (json['dob'] as Timestamp).toDate(),
+      dob: json['dob'], // Read as String
       sex: json['sex'],
       bloodType: json['bloodType'],
       email: json['email'],
@@ -83,6 +88,7 @@ class Donor {
       disqualificationStatus: json['disqualificationStatus'],
       donationRecord: json['donationRecord'],
       createdAt: (json['createdAt'] as Timestamp).toDate(),
+      birthday: json['birthday'] != null ? DateTime.parse(json['birthday']) : null,
     );
   }
 
@@ -91,7 +97,7 @@ class Donor {
     return Donor(
       id: doc.id,
       fullName: data['fullName'],
-      dob: (data['dob'] as Timestamp).toDate(),
+      dob: data['dob'], // Read as String
       sex: data['sex'],
       bloodType: data['bloodType'],
       email: data['email'],
@@ -100,6 +106,7 @@ class Donor {
       disqualificationStatus: data['disqualificationStatus'],
       donationRecord: data['donationRecord'],
       createdAt: (data['createdAt'] as Timestamp).toDate(),
+      birthday: data['birthday'] != null ? DateTime.parse(data['birthday']) : null,
     );
   }
 }

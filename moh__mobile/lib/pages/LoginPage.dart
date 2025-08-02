@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lifeline/providers/auth_provider.dart';
 import 'package:lifeline/pages/RegisterPage.dart';
 import 'package:lifeline/pages/dashboard.dart';
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 

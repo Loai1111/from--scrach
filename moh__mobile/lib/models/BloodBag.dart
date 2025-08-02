@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class BloodBag {
   final String id;
   final String donorId;
+  final String? donorName;
   final String bloodType;
   final String status;
   final DateTime donatedAt;
@@ -11,6 +12,7 @@ class BloodBag {
   BloodBag({
     required this.id,
     required this.donorId,
+    this.donorName,
     required this.bloodType,
     required this.status,
     required this.donatedAt,
@@ -20,6 +22,7 @@ class BloodBag {
   BloodBag copyWith({
     String? id,
     String? donorId,
+    String? donorName,
     String? bloodType,
     String? status,
     DateTime? donatedAt,
@@ -28,6 +31,7 @@ class BloodBag {
     return BloodBag(
       id: id ?? this.id,
       donorId: donorId ?? this.donorId,
+      donorName: donorName ?? this.donorName,
       bloodType: bloodType ?? this.bloodType,
       status: status ?? this.status,
       donatedAt: donatedAt ?? this.donatedAt,
@@ -38,6 +42,7 @@ class BloodBag {
   Map<String, dynamic> toJson() {
     return {
       'donorId': donorId,
+      'donorName': donorName,
       'bloodType': bloodType,
       'status': status,
       'donatedAt': Timestamp.fromDate(donatedAt),
@@ -49,6 +54,7 @@ class BloodBag {
     return BloodBag(
       id: json['id'],
       donorId: json['donorId'],
+      donorName: json['donorName'],
       bloodType: json['bloodType'],
       status: json['status'],
       donatedAt: (json['donatedAt'] as Timestamp).toDate(),
@@ -61,6 +67,7 @@ class BloodBag {
     return BloodBag(
       id: doc.id,
       donorId: data['donorId'],
+      donorName: data['donorName'],
       bloodType: data['bloodType'],
       status: data['status'],
       donatedAt: (data['donatedAt'] as Timestamp).toDate(),

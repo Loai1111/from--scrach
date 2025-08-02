@@ -9,18 +9,11 @@ import 'package:lifeline/pages/Profile.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lifeline/providers/auth_provider.dart';
 
-class Dashboard extends ConsumerStatefulWidget {
+class Dashboard extends ConsumerWidget {
   const Dashboard({super.key});
 
   @override
-  ConsumerState<Dashboard> createState() => _DashboardState();
-}
-
-class _DashboardState extends ConsumerState<Dashboard> {
-  String donorname = 'Mohammed';
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return WillPopScope(
       onWillPop: () async => false,
       child: Scaffold(
@@ -92,14 +85,32 @@ class _DashboardState extends ConsumerState<Dashboard> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Welcome, Donor',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
+                          ref.watch(userProvider).when(
+                                data: (user) => Text(
+                                  'Welcome, ${user?.name ?? 'Donor'}',
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                loading: () => const Text(
+                                  'Welcome, Donor',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                error: (err, stack) => const Text(
+                                  'Error loading user',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                              ),
                           const SizedBox(height: 4),
                           const Text(
                             'Ready to save a life today?',

@@ -43,7 +43,14 @@ class BloodInventoryRepository {
           .collection('bloodbags')
           .where('status', isEqualTo: 'Available')
           .get();
-      return snapshot.docs.map((doc) => BloodBag.fromFirestore(doc)).toList();
+      final bloodBags = <BloodBag>[];
+      for (final doc in snapshot.docs) {
+        final bloodBag = BloodBag.fromFirestore(doc);
+        final donorDoc = await _firestore.collection('donors').doc(bloodBag.donorId).get();
+        final donorName = donorDoc.exists ? donorDoc.data()!['fullName'] : 'Unknown';
+        bloodBags.add(bloodBag.copyWith(donorName: donorName));
+      }
+      return bloodBags;
     } catch (e) {
       print('Failed to load blood bags from Firestore: $e');
       throw Exception('Failed to load blood bags');

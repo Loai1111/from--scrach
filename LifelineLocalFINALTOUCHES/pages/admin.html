@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | Lifeline</title>
+    <link rel="stylesheet" href="../styles/admin.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Admin Dashboard</h1>
+            <button id="logout-btn" class="btn">Logout</button>
+        </header>
+        <main>
+            <div class="user-management">
+                <h2>User Management</h2>
+                <div id="all-users" class="tab-content active">
+                    <h3>All Users</h3>
+                    <button id="add-user-btn" class="btn btn-primary">Add User</button>
+                    <table id="users-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+        <div class="database-management">
+            <h2>Database Management</h2>
+            <p>Warning: These actions are irreversible and will permanently delete data.</p>
+            
+            <div id="delete-buttons-container">
+                <button class="btn btn-danger btn-delete-collection" data-collection="donors">Delete Donors</button>
+                <button class="btn btn-danger btn-delete-collection" data-collection="bloodbags">Delete Blood Bags</button>
+                <button class="btn btn-danger btn-delete-collection" data-collection="requests">Delete Requests</button>
+                <button class="btn btn-danger btn-delete-collection" data-collection="patients">Delete Patients</button>
+                <button class="btn btn-danger btn-delete-collection" data-collection="crossmatches">Delete Crossmatches</button>
+                <button class="btn btn-danger btn-delete-collection" data-collection="donations">Delete Donations</button>
+                <button class="btn btn-danger btn-delete-collection" data-collection="healthScreenings">Delete Health Screenings</button>
+                <button class="btn btn-danger btn-delete-collection" data-collection="labTests">Delete Lab Tests</button>
+                <button class="btn btn-danger btn-delete-collection" data-collection="questionnaires">Delete Questionnaires</button>
+                <button class="btn btn-danger btn-delete-collection" data-collection="rankings">Delete Rankings</button>
+                
+                <button class="btn btn-danger btn-delete-collection" data-collection="notifications" data-where-field="target" data-where-value="hospital">Delete Hospital Notifications</button>
+                <button class="btn btn-danger btn-delete-collection" data-collection="notifications" data-where-field="target" data-where-value="bloodbank">Delete Bloodbank Notifications</button>
+            </div>
+
+            <div class="user-deletion-section">
+                <h3>User Data Deletion</h3>
+                <p class="warning"><strong>Important:</strong> This only deletes user records from the database (e.g., name, email, role). It <strong>does not</strong> delete their authentication accounts, so they will still be able to log in. Full user deletion requires server-side administration.</p>
+                <div id="user-delete-buttons">
+                    <button class="btn btn-danger btn-delete-collection" data-collection="users" data-where-field="role" data-where-value="hospital">Delete Hospital Users</button>
+                    <button class="btn btn-danger btn-delete-collection" data-collection="users" data-where-field="role" data-where-value="bloodbank">Delete Bloodbank Users</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="user-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h3 id="modal-title">Add User</h3>
+            <form id="user-form">
+                <input type="hidden" id="user-id">
+                <div class="form-group">
+                    <label for="user-name">Name</label>
+                    <input type="text" id="user-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="user-email">Email</label>
+                    <input type="email" id="user-email" required>
+                </div>
+                <div class="form-group">
+                    <label for="user-role">Role</label>
+                    <select id="user-role" required>
+                        <option value="" disabled selected>Select a role</option>
+                        <option value="hospital">Hospital</option>
+                        <option value="bloodbank">Blood Bank</option>
+                    </select>
+                </div>
+                <div class="form-group" id="password-group">
+                    <label for="user-password">Password</label>
+                    <input type="password" id="user-password">
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" id="send-reset-btn" class="btn" style="display: none;">Send Password Reset</button>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="../scripts/views/admin/main.js"></script>
+</body>
+</html>
