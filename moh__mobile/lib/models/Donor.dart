@@ -13,6 +13,7 @@ class Donor {
   final int donationRecord;
   final DateTime createdAt;
   final DateTime? birthday;
+  final DateTime? lastDonationDate;
 
   Donor({
     required this.id,
@@ -27,6 +28,7 @@ class Donor {
     required this.donationRecord,
     required this.createdAt,
     this.birthday,
+    this.lastDonationDate,
   });
 
   Donor copyWith({
@@ -42,6 +44,7 @@ class Donor {
     int? donationRecord,
     DateTime? createdAt,
     DateTime? birthday,
+    DateTime? lastDonationDate,
   }) {
     return Donor(
       id: id ?? this.id,
@@ -56,6 +59,7 @@ class Donor {
       donationRecord: donationRecord ?? this.donationRecord,
       createdAt: createdAt ?? this.createdAt,
       birthday: birthday ?? this.birthday,
+      lastDonationDate: lastDonationDate ?? this.lastDonationDate,
     );
   }
 
@@ -72,6 +76,7 @@ class Donor {
       'donationRecord': donationRecord,
       'createdAt': Timestamp.fromDate(createdAt),
       'birthday': birthday?.toIso8601String(),
+      'lastDonationDate': lastDonationDate != null ? Timestamp.fromDate(lastDonationDate!) : null,
     };
   }
 
@@ -89,6 +94,7 @@ class Donor {
       donationRecord: json['donationRecord'],
       createdAt: (json['createdAt'] as Timestamp).toDate(),
       birthday: json['birthday'] != null ? DateTime.parse(json['birthday']) : null,
+      lastDonationDate: json['lastDonationDate'] != null ? (json['lastDonationDate'] as Timestamp).toDate() : null,
     );
   }
 
@@ -107,6 +113,7 @@ class Donor {
       donationRecord: data['donationRecord'],
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       birthday: data['birthday'] != null ? DateTime.parse(data['birthday']) : null,
+      lastDonationDate: data['lastDonationDate'] != null ? (data['lastDonationDate'] as Timestamp).toDate() : null,
     );
   }
 }

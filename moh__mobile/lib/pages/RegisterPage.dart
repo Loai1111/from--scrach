@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lifeline/providers/auth_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart'; // Add intl package to pubspec.yaml
+import 'package:intl/intl.dart';
 
 class Register extends ConsumerStatefulWidget {
   const Register({super.key});
@@ -20,7 +20,16 @@ class _RegisterState extends ConsumerState<Register> {
   String? _selectedSex;
   DateTime? _selectedDate;
 
-  final List<String> _bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  final List<String> _bloodTypes = [
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+    'O+',
+    'O-'
+  ];
   final List<String> _sexes = ['Male', 'Female'];
 
   Future<void> _register() async {
@@ -35,7 +44,7 @@ class _RegisterState extends ConsumerState<Register> {
             name: _nameController.text,
             bloodType: _selectedBloodType!,
             sex: _selectedSex!,
-            dob: dobString, // Pass as a formatted string
+            dob: dobString,
           );
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
@@ -51,6 +60,17 @@ class _RegisterState extends ConsumerState<Register> {
       initialDate: _selectedDate ?? DateTime.now(),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            primaryColor: Colors.red[800],
+            colorScheme: ColorScheme.light(primary: Colors.red[800]!),
+            buttonTheme:
+                const ButtonThemeData(textTheme: ButtonTextTheme.primary),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null && picked != _selectedDate) {
       setState(() {
@@ -62,67 +82,157 @@ class _RegisterState extends ConsumerState<Register> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Register')),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Register'),
+        centerTitle: true,
+        backgroundColor: Colors.red[800],
+        elevation: 0,
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextFormField(
+              const SizedBox(height: 20),
+              _buildTextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
-                validator: (value) => value!.isEmpty ? 'Enter your name' : null,
+                labelText: 'Name',
+                icon: Icons.person_outline,
+                validator: (value) =>
+                    value!.isEmpty ? 'Enter your name' : null,
               ),
-              TextFormField(
+              const SizedBox(height: 20),
+              _buildTextFormField(
                 controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Email'),
-                validator: (value) => value!.isEmpty ? 'Enter your email' : null,
+                labelText: 'Email',
+                icon: Icons.email_outlined,
+                validator: (value) =>
+                    value!.isEmpty ? 'Enter your email' : null,
               ),
-              TextFormField(
+              const SizedBox(height: 20),
+              _buildTextFormField(
                 controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Password'),
+                labelText: 'Password',
+                icon: Icons.lock_outline,
                 obscureText: true,
-                validator: (value) => value!.length < 6 ? 'Password must be at least 6 characters' : null,
+                validator: (value) => value!.length < 6
+                    ? 'Password must be at least 6 characters'
+                    : null,
               ),
-              DropdownButtonFormField<String>(
+              const SizedBox(height: 20),
+              _buildDropdownFormField(
                 value: _selectedBloodType,
-                decoration: const InputDecoration(labelText: 'Blood Type'),
-                items: _bloodTypes.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
+                labelText: 'Blood Type',
+                items: _bloodTypes,
                 onChanged: (value) => setState(() => _selectedBloodType = value),
-                validator: (value) => value == null ? 'Select your blood type' : null,
+                validator: (value) =>
+                    value == null ? 'Select your blood type' : null,
               ),
-              DropdownButtonFormField<String>(
+              const SizedBox(height: 20),
+              _buildDropdownFormField(
                 value: _selectedSex,
-                decoration: const InputDecoration(labelText: 'Sex'),
-                items: _sexes.map((sex) => DropdownMenuItem(value: sex, child: Text(sex))).toList(),
+                labelText: 'Sex',
+                items: _sexes,
                 onChanged: (value) => setState(() => _selectedSex = value),
                 validator: (value) => value == null ? 'Select your sex' : null,
               ),
-              TextFormField(
-                decoration: const InputDecoration(
-                  labelText: 'Birthday',
-                  suffixIcon: Icon(Icons.calendar_today),
-                ),
-                readOnly: true,
-                controller: TextEditingController(
-                  text: _selectedDate == null
-                      ? ''
-                      : "${_selectedDate!.toLocal()}".split(' ')[0],
-                ),
-                onTap: () => _selectDate(context),
-                validator: (value) =>
-                    _selectedDate == null ? 'Please select your birthday' : null,
-              ),
               const SizedBox(height: 20),
+              _buildDatePickerFormField(context),
+              const SizedBox(height: 30),
               ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[800],
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 onPressed: _register,
-                child: const Text('Register'),
+                child: const Text(
+                  'Register',
+                  style: TextStyle(fontSize: 18, color: Colors.white),
+                ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTextFormField({
+    required TextEditingController controller,
+    required String labelText,
+    required IconData icon,
+    bool obscureText = false,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      decoration: InputDecoration(
+        labelText: labelText,
+        prefixIcon: Icon(icon, color: Colors.red[800]),
+        filled: true,
+        fillColor: Colors.red.shade50,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      validator: validator,
+    );
+  }
+
+  Widget _buildDropdownFormField({
+    required String? value,
+    required String labelText,
+    required List<String> items,
+    void Function(String?)? onChanged,
+    String? Function(String?)? validator,
+  }) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      decoration: InputDecoration(
+        labelText: labelText,
+        prefixIcon: Icon(Icons.bloodtype_outlined, color: Colors.red[800]),
+        filled: true,
+        fillColor: Colors.red.shade50,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+      onChanged: onChanged,
+      validator: validator,
+    );
+  }
+
+  Widget _buildDatePickerFormField(BuildContext context) {
+    return TextFormField(
+      readOnly: true,
+      controller: TextEditingController(
+        text: _selectedDate == null
+            ? ''
+            : DateFormat('yyyy-MM-dd').format(_selectedDate!),
+      ),
+      decoration: InputDecoration(
+        labelText: 'Birthday',
+        prefixIcon: Icon(Icons.calendar_today_outlined, color: Colors.red[800]),
+        filled: true,
+        fillColor: Colors.red.shade50,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      onTap: () => _selectDate(context),
+      validator: (value) =>
+          _selectedDate == null ? 'Please select your birthday' : null,
     );
   }
 }

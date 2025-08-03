@@ -8,7 +8,7 @@ class DonorRepository {
 
   Future<void> addDonor(Donor donor) async {
     try {
-      await _donorsCollection.add(donor.toJson());
+      await _donorsCollection.doc(donor.id).set(donor.toJson());
     } catch (e) {
       print('Error adding donor: $e');
       throw Exception('Failed to add donor');
@@ -39,10 +39,9 @@ class DonorRepository {
 
   Future<Donor?> getDonorProfile(String uid) async {
     try {
-      final querySnapshot =
-          await _donorsCollection.where('userId', isEqualTo: uid).limit(1).get();
-      if (querySnapshot.docs.isNotEmpty) {
-        return Donor.fromFirestore(querySnapshot.docs.first);
+      final docSnapshot = await _donorsCollection.doc(uid).get();
+      if (docSnapshot.exists) {
+        return Donor.fromFirestore(docSnapshot);
       }
       return null;
     } catch (e) {

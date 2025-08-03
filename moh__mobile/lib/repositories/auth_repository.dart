@@ -53,6 +53,7 @@ class AuthRepository {
 
     // Create donor document
     await _firestore.collection('donors').doc(cred.user!.uid).set({
+      'userId': cred.user!.uid,
       'fullName': name,
       'email': email,
       'bloodType': bloodType,

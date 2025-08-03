@@ -138,15 +138,6 @@ class Dashboard extends ConsumerWidget {
                 childAspectRatio: 1.3,
                 children: [
                   _buildDashboardButton(
-                    icon: Icons.cloud_upload_outlined,
-                    label: 'Verify Connection',
-                    onTap: () {
-                      FirebaseFirestore.instance
-                          .collection('verification')
-                          .add({'timestamp': FieldValue.serverTimestamp()});
-                    },
-                  ),
-                  _buildDashboardButton(
                     icon: Icons.check_circle_outline,
                     label: 'Eligibility',
                     onTap: () {

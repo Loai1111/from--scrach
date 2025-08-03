@@ -10,45 +10,33 @@ import { getLabTestByDonorId } from "./labTest.service.js";
 import { bloodCompatibility } from '../utils.js';
 import { rankingService } from './ranking.service.js';
 import { createNotification } from './notification.service.js';
-import { updateRequestAfterMatching } from './request.service.js';
 
 /**
  * Checks if a donor's blood is compatible with a recipient's blood based on ABO/Rh, alloantibodies, CMV status, and Sickle Cell status.
+ *
+ * IMPORTANT: CMV and Sickle Cell status must match EXACTLY between donor and recipient.
  *
  * @param {object} recipient - The recipient's blood profile.
  * @param {string} recipient.abo - The recipient's ABO blood type.
  * @param {string} recipient.rh - The recipient's Rh factor.
  * @param {string[]} [recipient.currentAntibodies] - A list of the recipient's current antibodies.
- * @param {boolean} [recipient.requiresCmvNegative] - Whether the recipient requires CMV negative blood.
- * @param {boolean} [recipient.requiresSickleCellNegative] - Whether the recipient requires Sickle Cell negative blood.
+ * @param {string} recipient.cmvStatus - The recipient's CMV status ("Positive" or "Negative").
+ * @param {string} recipient.sickleCellStatus - The recipient's Sickle Cell status ("Positive" or "Negative").
  * @param {object} donor - The donor's blood profile.
  * @param {string} donor.abo - The donor's ABO blood type.
  * @param {string} donor.rh - The donor's Rh factor.
  * @param {string[]} [donor.minorAntigens] - A list of the donor's minor antigens.
- * @param {string} [donor.cmvStatus] - The donor's CMV status ("Positive", "Negative", or "Unknown").
- * @param {string} [donor.sickleCellStatus] - The donor's Sickle Cell status ("Positive", "Negative", or "Unknown").
+ * @param {string} donor.cmvStatus - The donor's CMV status ("Positive" or "Negative").
+ * @param {string} donor.sickleCellStatus - The donor's Sickle Cell status ("Positive" or "Negative").
  * @returns {boolean} - True if the blood is compatible, false otherwise.
  */
 export function isCompatible(recipient, donor) {
-    // If recipient is 'Unknown', they can only receive from O- donors.
-    if (recipient.abo === 'Unknown') {
-        return donor.abo === 'O' && donor.rh === '-';
-    }
+    const recipientBloodType = `${recipient.abo}${recipient.rh}`;
+    const donorBloodType = `${donor.abo}${donor.rh}`;
 
-    // Rh compatibility: Rh- recipient cannot receive Rh+ blood
-    if (recipient.rh === '-' && donor.rh === '+') {
-        return false;
-    }
-
-    // ABO compatibility
-    const aboCompatibility = {
-        'A': ['A', 'O'],
-        'B': ['B', 'O'],
-        'AB': ['A', 'B', 'AB', 'O'],
-        'O': ['O'],
-    };
-
-    if (!aboCompatibility[recipient.abo].includes(donor.abo)) {
+    // Use the centralized bloodCompatibility rules
+    const compatibleDonors = bloodCompatibility[recipientBloodType];
+    if (!compatibleDonors || !compatibleDonors.includes(donorBloodType)) {
         return false;
     }
 
@@ -66,93 +54,64 @@ export function isCompatible(recipient, donor) {
         }
     }
 
-    // CMV compatibility
-    if (recipient.requiresCmvNegative) {
-        if (!donor.cmvStatus) {
-            console.warn('CMV status is missing for donor - assuming incompatible for CMV negative requirement');
-            return false;
-        }
-        
-        // Normalize CMV status to handle case variations
-        const normalizedCmvStatus = donor.cmvStatus.toLowerCase().trim();
-        
-        if (normalizedCmvStatus === 'negative') {
-            // Compatible - donor is CMV negative
-            console.log('CMV compatibility check passed: Donor is CMV negative');
-        } else if (normalizedCmvStatus === 'positive' || normalizedCmvStatus === 'unknown') {
-            // Incompatible - donor is either CMV positive or status is unknown
-            console.log(`CMV compatibility check failed: Donor is ${donor.cmvStatus}, but recipient requires CMV negative`);
-            return false;
-        } else {
-            // Handle unexpected CMV status values
-            console.warn(`Unexpected CMV status value: ${donor.cmvStatus} - assuming incompatible for CMV negative requirement`);
-            return false;
-        }
+    // MANDATORY CMV Status Matching - must be EXACTLY the same
+    if (!recipient.cmvStatus || !donor.cmvStatus) {
+        console.warn('CMV status missing - incompatible');
+        return false;
+    }
+    
+    // Normalize CMV status for comparison
+    const recipientCmv = recipient.cmvStatus.toLowerCase().trim();
+    const donorCmv = donor.cmvStatus.toLowerCase().trim();
+    
+    if (recipientCmv !== donorCmv) {
+        console.log(`CMV status mismatch: Recipient is ${recipient.cmvStatus}, Donor is ${donor.cmvStatus}`);
+        return false;
     }
 
-    // Sickle Cell compatibility
-    if (recipient.requiresSickleCellNegative) {
-        if (!donor.sickleCellStatus) {
-            console.warn('Sickle Cell status is missing for donor - assuming incompatible for Sickle Cell negative requirement');
-            return false;
-        }
-        
-        // Normalize Sickle Cell status to handle case variations
-        const normalizedSickleCellStatus = donor.sickleCellStatus.toLowerCase().trim();
-        
-        if (normalizedSickleCellStatus === 'negative') {
-            // Compatible - donor is Sickle Cell negative
-            console.log('Sickle Cell compatibility check passed: Donor is Sickle Cell negative');
-        } else if (normalizedSickleCellStatus === 'positive' || normalizedSickleCellStatus === 'unknown') {
-            // Incompatible - donor is either Sickle Cell positive or status is unknown
-            console.log(`Sickle Cell compatibility check failed: Donor is ${donor.sickleCellStatus}, but recipient requires Sickle Cell negative`);
-            return false;
-        } else {
-            // Handle unexpected Sickle Cell status values
-            console.warn(`Unexpected Sickle Cell status value: ${donor.sickleCellStatus} - assuming incompatible for Sickle Cell negative requirement`);
-            return false;
-        }
+    // MANDATORY Sickle Cell Status Matching - must be EXACTLY the same
+    if (!recipient.sickleCellStatus || !donor.sickleCellStatus) {
+        console.warn('Sickle Cell status missing - incompatible');
+        return false;
+    }
+    
+    // Normalize Sickle Cell status for comparison
+    const recipientSickleCell = recipient.sickleCellStatus.toLowerCase().trim();
+    const donorSickleCell = donor.sickleCellStatus.toLowerCase().trim();
+    
+    if (recipientSickleCell !== donorSickleCell) {
+        console.log(`Sickle Cell status mismatch: Recipient is ${recipient.sickleCellStatus}, Donor is ${donor.sickleCellStatus}`);
+        return false;
     }
 
     return true;
 }
 
 /**
- * Finds compatible blood bags for a given patient based on ABO/Rh and alloantibody compatibility.
+ * Finds compatible blood bags for a given patient based on ABO/Rh, alloantibody compatibility,
+ * and MANDATORY matching of CMV and Sickle Cell status.
  *
- * The matching process involves two main steps:
- * 1.  **Primary Check (ABO/Rh):** Filters out blood bags that are incompatible with the patient's
- *     ABO blood group and Rh factor. This is determined by the patient's expected antibodies.
- *     For instance, a patient with Anti-B antibodies cannot receive blood with the B antigen.
- *     Additionally, an Rh-negative patient should not receive Rh-positive blood.
+ * The matching process involves:
+ * 1.  **Blood Type Compatibility:** ABO/Rh compatibility check
+ * 2.  **Alloantibody Check:** Ensures no conflicting antigens
+ * 3.  **Mandatory Special Requirements:** CMV and Sickle Cell status MUST match exactly
  *
- * 2.  **Secondary Check (Alloantibodies):** After the primary check, this step filters the remaining
- *     bags for compatibility with the patient's known unexpected antibodies (alloantibodies).
- *     If a patient has an antibody (e.g., Anti-Kell), any blood bag from a donor with the corresponding
- *     minor antigen (e.g., K) is considered incompatible.
- *
- * @param {object} patient - The patient object, containing their antigen profile and antibody history.
- * @param {object} patient.antigenProfile - The patient's blood antigens.
- * @param {string} patient.antigenProfile.abo - The patient's ABO blood type (e.g., "A", "B", "AB", "O").
- * @param {string} patient.antigenProfile.rh - The patient's Rh factor ("+" or "-").
- * @param {object} patient.antibodyHistory - The patient's antibody history.
- * @param {string[]} patient.antibodyHistory.expectedAntibodies - Antibodies expected based on ABO type (e.g., ["Anti-B"]).
- * @param {string[]} [patient.antibodyHistory.unexpectedAntibodies] - Any known alloantibodies (e.g., ["Anti-Kell"]).
- * @param {Array<object>} bloodBags - An array of blood bag objects to be checked for compatibility.
- * @param {object} bloodBags[].donor - The donor who donated the blood.
- * @param {object} bloodBags[].donor.antigenProfile - The donor's antigen profile.
- * @param {string} bloodBags[].donor.antigenProfile.abo - The donor's ABO blood type.
- * @param {string} bloodBags[].donor.antigenProfile.rh - The donor's Rh factor.
- * @param {string[]} [bloodBags[].donor.antigenProfile.minorAntigens] - Minor antigens present on the red cells of the donor (e.g., ["K"]).
- * @returns {Array<object>} An array of blood bags that are compatible with the patient.
+ * @param {object} patient - The patient object
+ * @param {string} patient.bloodGroup - The patient's ABO blood type (e.g., "A", "B", "AB", "O")
+ * @param {string} patient.rhFactor - The patient's Rh factor ("+" or "-")
+ * @param {string[]} [patient.currentAntibodies] - Any known alloantibodies
+ * @param {string} patient.cmvStatus - The patient's CMV status ("Positive" or "Negative")
+ * @param {string} patient.sickleCellStatus - The patient's Sickle Cell status ("Positive" or "Negative")
+ * @param {Array<object>} bloodBags - An array of blood bag objects to be checked for compatibility
+ * @returns {Array<object>} An array of blood bags that are compatible with the patient
  */
-export function findCompatibleBloodBags(patient, bloodBags, specialRequirements = []) {
+export function findCompatibleBloodBags(patient, bloodBags) {
     const recipientProfile = {
         abo: patient.bloodGroup,
         rh: patient.rhFactor,
-        currentAntibodies: patient.currentAntibodies || [], // Use currentAntibodies
-        requiresCmvNegative: specialRequirements.includes('CMV Negative'),
-        requiresSickleCellNegative: specialRequirements.includes('Sickle Cell Negative'),
+        currentAntibodies: patient.currentAntibodies || [],
+        cmvStatus: patient.cmvStatus,
+        sickleCellStatus: patient.sickleCellStatus,
     };
 
     return bloodBags.filter(bag => {
@@ -164,8 +123,8 @@ export function findCompatibleBloodBags(patient, bloodBags, specialRequirements 
             abo: bag.bloodType ? bag.bloodType.slice(0, -1) : 'Unknown',
             rh: bag.bloodType ? bag.bloodType.slice(-1) : '-',
             minorAntigens: bag.antigen_profile || [],
-            cmvStatus: bag.cmvStatus || 'Unknown',
-            sickleCellStatus: bag.sickleCellStatus || 'Unknown',
+            cmvStatus: bag.cmvStatus,
+            sickleCellStatus: bag.sickleCellStatus,
         };
 
         return isCompatible(recipientProfile, donorProfile);
@@ -173,190 +132,215 @@ export function findCompatibleBloodBags(patient, bloodBags, specialRequirements 
 }
 
 /**
- * The main algorithm for the Global Matching Run.
+ * The Global Matching Algorithm (GMA) - Core matching logic for blood bag allocation
+ *
+ * This algorithm runs whenever:
+ * 1. A new request is created
+ * 2. An existing request is cancelled
+ * 3. A new blood bag is added to inventory
+ *
+ * The algorithm ensures optimal distribution of blood bags based on priority and compatibility.
  */
 export async function runGlobalMatching() {
-    console.log("Starting Global Matching Run...");
-    const batch = writeBatch(db);
+    console.log("=== Starting Global Matching Algorithm ===");
+    
+    try {
+        const batch = writeBatch(db);
 
-    // 1. Cleanup: Delete all pending crossmatch tests and old match ranks
-    const pendingTestsQuery = query(collection(db, 'crossmatchTests'), where('status', '==', 'Matched'));
-    const pendingTestsSnapshot = await getDocs(pendingTestsQuery);
-    const bagsToReset = new Set();
-    pendingTestsSnapshot.forEach(doc => {
-        const testData = doc.data();
-        if (testData.bloodBagId) {
-            bagsToReset.add(testData.bloodBagId);
-        }
-        batch.delete(doc.ref);
-    });
-
-    if (bagsToReset.size > 0) {
-        bagsToReset.forEach(bagId => {
-            const bagRef = doc(db, 'bloodbags', bagId);
-            batch.update(bagRef, { status: 'Available' });
+        // Step 1: Cleanup - Delete all existing crossmatches with status "pending"
+        console.log("Step 1: Cleaning up pending crossmatches...");
+        const pendingCrossmatchQuery = query(
+            collection(db, 'crossmatchtests'),
+            where('status', '==', 'pending')
+        );
+        const pendingCrossmatchSnapshot = await getDocs(pendingCrossmatchQuery);
+        
+        let deletedCount = 0;
+        pendingCrossmatchSnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+            deletedCount++;
         });
-    }
+        console.log(`Deleted ${deletedCount} pending crossmatches`);
 
-    const oldRanksQuery = query(collection(db, 'matchRanks'));
-    const oldRanksSnapshot = await getDocs(oldRanksQuery);
-    oldRanksSnapshot.forEach(doc => {
-        batch.delete(doc.ref);
-    });
+        // Step 2: Data Fetching
+        console.log("Step 2: Fetching data...");
+        
+        // Fetch all active requests (status: "pending")
+        const activeRequestsQuery = query(
+            collection(db, 'requests'),
+            where('status', '==', 'pending')
+        );
+        const requestsSnapshot = await getDocs(activeRequestsQuery);
+        let activeRequests = [];
+        requestsSnapshot.forEach(doc => {
+            // Use adapter to handle both old and new data models
+            const requestData = adaptRequestData({ id: doc.id, ...doc.data() });
+            activeRequests.push(requestData);
+        });
+        console.log(`Found ${activeRequests.length} active requests`);
 
-    // 2. Data Collection
-    const requestsQuery = query(collection(db, 'requests'), where('status', 'in', ['pending', 'escalated', 'partially_allocated']));
-    const requestsSnapshot = await getDocs(requestsQuery);
-    let allRequests = [];
-    requestsSnapshot.forEach(doc => allRequests.push({ id: doc.id, ...doc.data() }));
+        // Fetch all eligible blood bags (any status except "issued")
+        // Note: Using 'bloodbags' collection name as per current implementation
+        const eligibleBagsQuery = query(
+            collection(db, 'bloodbags'),
+            where('status', '!=', 'issued')
+        );
+        const bagsSnapshot = await getDocs(eligibleBagsQuery);
+        let eligibleBags = [];
+        bagsSnapshot.forEach(doc => {
+            // Use adapter to ensure consistent bag data structure
+            const bagData = adaptBagData({ id: doc.id, ...doc.data() });
+            eligibleBags.push(bagData);
+        });
+        console.log(`Found ${eligibleBags.length} eligible blood bags`);
 
-    const priorityMap = { 'EMERGENCY': 1, 'URGENT': 2, 'Scheduled': 3 };
-    allRequests.sort((a, b) => (priorityMap[a.urgency] || 4) - (priorityMap[b.urgency] || 4));
+        const patients = {};
 
-    const bagsQuery = query(collection(db, 'bloodbags'), where('status', 'in', ['Available', 'Allocated', 'Crossmatching']));
-    const bagsSnapshot = await getDocs(bagsQuery);
-    let availableUnits = [];
-    bagsSnapshot.forEach(doc => availableUnits.push({ id: doc.id, ...doc.data() }));
+        // Step 3: Compatibility Mapping
+        console.log("Step 3: Building compatibility matrix...");
+        const compatibilityMap = new Map();
+        
+        for (const request of activeRequests) {
+            if (!request.patientId) {
+                console.warn(`Request ${request.id} has no patientId`);
+                continue;
+            }
+            let patient = patients[request.patientId];
+            if (!patient) {
+                patient = await getPatientById(request.patientId);
+                if (patient) {
+                    patients[request.patientId] = patient;
+                } else {
+                    console.warn(`Patient not found for request ${request.id}`);
+                    continue;
+                }
+            }
 
-    const patientPromises = allRequests.map(req => getPatientById(req.patientId));
-    const patients = (await Promise.all(patientPromises)).reduce((acc, p) => {
-        if (p) acc[p.id] = p;
-        return acc;
-    }, {});
-
-    // 3. Compatibility Matrix Generation & Rank Storage
-    const compatibilityMatrix = new Map();
-    for (const request of allRequests) {
-        const patient = patients[request.patientId];
-        if (!patient && request.bloodType !== 'Any') {
-            console.log(`Skipping request ${request.id} because patient data is missing.`);
-            continue;
-        }
-
-        console.log(`Processing request ${request.id} for patient ${patient?.fullName || 'N/A'}`);
-        let compatibleUnits;
-        if (request.bloodType === 'Any' || request.bloodType === 'Unknown') {
-            compatibleUnits = availableUnits.filter(unit => unit.bloodType === 'O-');
-        } else {
-            // Use the findCompatibleBloodBags function which now includes CMV compatibility checking
-            compatibleUnits = findCompatibleBloodBags(patient, availableUnits, request.specialRequirements || []);
+            // Find compatible bags
+            const compatibleBags = findCompatibleBloodBags(patient, eligibleBags);
             
-            // Additional filtering for failed units and other special requirements
-            compatibleUnits = compatibleUnits.filter((unit, index) => {
-                if (index === 0) { // Log only for the first unit to avoid spamming
-                    console.log(`--- Checking additional compatibility for Request ${request.id} ---`);
-                    console.log("Patient Data:", JSON.stringify(patient, null, 2));
-                    console.log("Unit Data:", JSON.stringify(unit, null, 2));
-                }
-                
-                if (patient.failedUnits?.includes(unit.id)) {
-                    if (index === 0) console.log(`Compatibility Fail: Unit ${unit.id} is in patient's failed units list.`);
-                    return false;
-                }
-
-                const meetsSpecialRequirements = request.specialRequirements?.every(req =>
-                    req === 'CMV Negative' || req === 'Sickle Cell Negative' || unit.special_attributes?.includes(req)
-                ) ?? true;
-                if (!meetsSpecialRequirements && index === 0) {
-                    console.log(`Compatibility Fail: Unit does not meet special requirements.`);
-                }
-                return meetsSpecialRequirements;
+            // Sort by expiry date (soonest first)
+            compatibleBags.sort((a, b) => {
+                const dateA = a.expiryDate?.toDate ? a.expiryDate.toDate() : new Date(a.expiryDate);
+                const dateB = b.expiryDate?.toDate ? b.expiryDate.toDate() : new Date(b.expiryDate);
+                return dateA - dateB;
             });
+
+            compatibilityMap.set(request.id, compatibleBags);
+            console.log(`Request ${request.id}: ${compatibleBags.length} compatible bags found`);
         }
 
-        console.log(`Found ${compatibleUnits.length} compatible units for request ${request.id}.`);
-        const rankedUnits = rankingService.rankCompatibleBags(patient, compatibleUnits, request);
-        console.log(`Found ${rankedUnits.length} ranked units for request ${request.id}.`);
-        compatibilityMatrix.set(request.id, rankedUnits);
-
-        // Store the ranking result in Firestore
-        const rankDocRef = doc(collection(db, 'matchRanks'));
-        batch.set(rankDocRef, {
-            requestId: request.id,
-            createdAt: serverTimestamp(),
-            rankedUnits: rankedUnits.map(u => ({ id: u.id, bloodType: u.bloodType, score: u.totalScore, expiryDate: u.expiryDate }))
+        // Step 4: Prioritized Allocation Loop
+        console.log("Step 4: Starting prioritized allocation...");
+        
+        // Sort requests by priority: EMERGENCY -> URGENT -> ROUTINE
+        const priorityOrder = { 'EMERGENCY': 1, 'URGENT': 2, 'ROUTINE': 3 };
+        activeRequests.sort((a, b) => {
+            const priorityA = priorityOrder[a.priority] || 4;
+            const priorityB = priorityOrder[b.priority] || 4;
+            return priorityA - priorityB;
         });
-    }
 
-    // 4. Intelligent Allocation
-    const assignedUnits = new Set();
-    const requestUpdates = [];
+        const assignedBags = new Set();
+        const requestAllocations = new Map();
 
-    for (const request of allRequests) {
-        const previouslyAllocatedBags = request.allocatedBags || [];
-        const requiredQty = request.quantity - previouslyAllocatedBags.length;
+        for (const request of activeRequests) {
+            const compatibleBags = compatibilityMap.get(request.id) || [];
+            const allocatedBags = [];
+            const requiredBags = request.requiredBags || 0;
 
-        if (requiredQty <= 0) {
-            continue;
-        }
+            console.log(`\nProcessing ${request.priority} request ${request.id} (needs ${requiredBags} bags)`);
 
-        const compatibleUnits = compatibilityMatrix.get(request.id) || [];
-        console.log(`Allocating for request ${request.id}. Required: ${requiredQty}, Compatible: ${compatibleUnits.length}`);
+            for (const bag of compatibleBags) {
+                if (allocatedBags.length >= requiredBags) break;
+                if (assignedBags.has(bag.id)) continue;
 
-        const newlyAssignedUnits = [];
-        for (const unit of compatibleUnits) {
-            if (newlyAssignedUnits.length >= requiredQty) break;
-            if (assignedUnits.has(unit.id)) continue;
-            if (previouslyAllocatedBags.includes(unit.id)) continue;
+                // Step 5: The Critical Check
+                console.log(`  Checking bag ${bag.id} (${bag.bloodType})...`);
+                let isCriticalForOther = false;
 
-            let isLastResortForOther = false;
-            for (const otherRequest of allRequests) {
-                if (otherRequest.id === request.id) continue;
-                if ((priorityMap[otherRequest.urgency] || 4) < (priorityMap[request.urgency] || 4)) continue;
-                
-                const otherCompatibleUnits = compatibilityMatrix.get(otherRequest.id) || [];
-                if (otherCompatibleUnits.length === 1 && otherCompatibleUnits.id === unit.id) {
-                    isLastResortForOther = true;
-                    break;
+                for (const otherRequest of activeRequests) {
+                    if (otherRequest.id === request.id) continue;
+
+                    // Check if other request has same or higher priority
+                    const otherPriority = priorityOrder[otherRequest.priority] || 4;
+                    const currentPriority = priorityOrder[request.priority] || 4;
+                    
+                    if (otherPriority <= currentPriority) {
+                        const otherCompatibleBags = compatibilityMap.get(otherRequest.id) || [];
+                        // Filter out already assigned bags from other's compatible list
+                        const otherAvailableBags = otherCompatibleBags.filter(b => !assignedBags.has(b.id));
+                        
+                        // Check if this bag is the ONLY available option for the other request
+                        if (otherAvailableBags.length === 1 && otherAvailableBags[0].id === bag.id) {
+                            console.log(`    Critical: Bag ${bag.id} is the only option for ${otherRequest.priority} request ${otherRequest.id}`);
+                            isCriticalForOther = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!isCriticalForOther) {
+                    // Assign the bag
+                    allocatedBags.push(bag);
+                    assignedBags.add(bag.id);
+                    console.log(`    Assigned bag ${bag.id} to request ${request.id}`);
                 }
             }
 
-            if (!isLastResortForOther) {
-                newlyAssignedUnits.push(unit);
-                assignedUnits.add(unit.id);
-            }
+            requestAllocations.set(request.id, allocatedBags);
+            console.log(`  Total allocated: ${allocatedBags.length}/${requiredBags}`);
         }
 
-        if (newlyAssignedUnits.length > 0) {
-            console.log(`Assigning ${newlyAssignedUnits.length} new units to request ${request.id}`);
+        // Step 6: Create crossmatches and update statuses
+        console.log("\nStep 5 & 6: Creating crossmatches and updating statuses...");
+
+        for (const [requestId, allocatedBags] of requestAllocations) {
+            const request = activeRequests.find(r => r.id === requestId);
             
-            newlyAssignedUnits.forEach(unit => {
-                const testRef = doc(collection(db, 'crossmatchTests'));
-                batch.set(testRef, {
-                    requestId: request.id,
-                    bloodBagId: unit.id,
-                    patientId: request.patientId,
-                    hospitalId: request.hospitalId,
-                    status: 'Matched',
-                    result: 'Pending',
+            // Create crossmatch records
+            for (const bag of allocatedBags) {
+                const crossmatchRef = doc(collection(db, 'crossmatchtests'));
+                batch.set(crossmatchRef, {
+                    requestId: requestId,
+                    bagId: bag.id,
+                    status: 'pending',
                     createdAt: serverTimestamp()
                 });
-                const bagRef = doc(db, 'bloodbags', unit.id);
-                batch.update(bagRef, { status: 'Crossmatching' });
+
+                // Update bag status based on request priority
+                // Note: Using 'bloodbags' collection name as per current implementation
+                const bagRef = doc(db, 'bloodbags', bag.id);
+                const newBagStatus = (request.priority === 'EMERGENCY' || request.priority === 'URGENT')
+                    ? 'allocated'
+                    : 'pending crossmatching';
+                
+                batch.update(bagRef, { status: newBagStatus });
+            }
+
+            // Update request status and matchedBags count
+            const requestRef = doc(db, 'requests', requestId);
+            const matchedCount = allocatedBags.length;
+            const requiredCount = request.requiredBags || 0;
+            
+            const newRequestStatus = matchedCount >= requiredCount ? 'matched' : 'escalated';
+            
+            batch.update(requestRef, {
+                matchedBags: matchedCount,
+                status: newRequestStatus
             });
 
-            requestUpdates.push({
-                requestId: request.id,
-                matchedBags: newlyAssignedUnits,
-                status: 'crossmatching'
-            });
-
-        } else if (previouslyAllocatedBags.length === 0) {
-            requestUpdates.push({
-                requestId: request.id,
-                matchedBags: [],
-                status: 'pending'
-            });
+            console.log(`Request ${requestId}: ${matchedCount}/${requiredCount} bags matched, status: ${newRequestStatus}`);
         }
-    }
 
-    // Perform all request updates after the main loop
-    for (const update of requestUpdates) {
-        await updateRequestAfterMatching(update.requestId, update.matchedBags, update.status);
-    }
+        // Commit all changes atomically
+        await batch.commit();
+        console.log("\n=== Global Matching Algorithm completed successfully ===");
 
-    await batch.commit();
-    console.log("Global Matching Run finished.");
+    } catch (error) {
+        console.error("Error in Global Matching Algorithm:", error);
+        throw error;
+    }
 }
 
 /**
@@ -474,6 +458,38 @@ export function testCmvNegativeFilter() {
  *
  * @returns {object} Test results with pass/fail status for each test case
  */
+/**
+ * Adapter function to handle the transition between old and new data models
+ * Maps old field names to new field names for requests
+ */
+function adaptRequestData(request) {
+    return {
+        ...request,
+        // Map urgency to priority if priority doesn't exist
+        priority: request.priority || request.urgency,
+        // Map quantity to requiredBags if requiredBags doesn't exist
+        requiredBags: request.requiredBags || request.quantity,
+        // Map matchedCount to matchedBags if matchedBags doesn't exist
+        matchedBags: request.matchedBags !== undefined ? request.matchedBags : request.matchedCount
+    };
+}
+
+/**
+ * Adapter function for blood bags to ensure consistent data structure
+ */
+function adaptBagData(bag) {
+    // Ensure the bag has the correct structure for the new GMA
+    return {
+        ...bag,
+        // Ensure status is lowercase for consistency
+        status: bag.status ? bag.status.toLowerCase() : 'available',
+        // Ensure CMV and Sickle Cell status are present
+        cmvStatus: bag.cmvStatus || 'Unknown',
+        sickleCellStatus: bag.sickleCellStatus || 'Unknown'
+    };
+}
+
+
 export function testSickleCellNegativeFilter() {
     console.log("Testing Sickle Cell Negative filter implementation...");
     

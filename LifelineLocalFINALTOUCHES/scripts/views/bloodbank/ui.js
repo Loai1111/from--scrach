@@ -573,6 +573,11 @@ async function renderDetailsPanel() {
                     <p><strong>Quantity:</strong> ${selectedItem.matchedCount || 0} Matched / ${selectedItem.allocatedCount || 0} Allocated / ${selectedItem.quantity} Required</p>
                     <p><strong>Status:</strong> ${getStatusBadge(selectedItem.status)}</p>
                     <p><strong>Created:</strong> ${safeFormatDate(selectedItem.createdAt)}</p>
+                    <p><strong>Special Requirements:</strong> ${
+                        selectedItem.specialRequirements && selectedItem.specialRequirements.length > 0
+                            ? selectedItem.specialRequirements.join(', ')
+                            : 'None'
+                    }</p>
                 </div>
             `;
             break;

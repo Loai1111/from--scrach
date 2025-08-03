@@ -38,43 +38,46 @@ export async function addDonation(donor, labTestId) {
     if (!labTestId) {
         throw new Error("A labTestId is required to record a donation.");
     }
-    
-    // Get the lab test to retrieve antigen information
-    const labTest = await getLabTestById(labTestId);
-    if (!labTest) {
+
+    // Step 1: Fetch the complete and up-to-date labTest document from Firestore.
+    const labTestRef = doc(db, 'labTests', labTestId);
+    const labTestSnap = await getDoc(labTestRef);
+
+    if (!labTestSnap.exists()) {
         throw new Error(`Lab test with ID ${labTestId} not found.`);
     }
-    
-    // Step 1: Create the new blood bag with antigen information from the lab test.
-    // The `addBloodBag` function will set the donatedAt timestamp.
-    const newBagRef = await addBloodBag({
+    const labTest = labTestSnap.data();
+
+    // Step 2: Create a new, clean bloodBagData object with explicitly mapped fields.
+    const bloodBagData = {
         donorId: donor.id,
         bloodType: donor.bloodType,
-        antigen_profile: labTest.antigen_profile || [],
+        donatedAt: new Date(), // Use current date for donation
+        antigen_profile: labTest.antigenProfile || [], // Ensure correct field name
         cmvStatus: labTest.cmvStatus || 'Unknown',
-        sickleCellStatus: labTest.sickleCellStatus || 'Unknown'
-    });
+        sickleCellStatus: labTest.sickleCellStatus || 'Unknown',
+    };
 
-    // Step 2: Create the donation record linking to the new blood bag and the lab test.
+    // Step 3: Call inventory.addBloodBag with the new data.
+    const newBagRef = await addBloodBag(bloodBagData);
+
+    // Step 4: Create the donation record.
     const newDonationData = {
         donorId: donor.id,
         labTestId: labTestId,
         bloodBagId: newBagRef.id,
-        donatedAt: serverTimestamp(), // Record the donation time.
+        donatedAt: serverTimestamp(),
         status: 'Completed'
     };
-    
+
     const donationDocRef = await addDoc(collection(db, 'donations'), newDonationData);
     console.log(`Successfully recorded donation ${donationDocRef.id} for donor ${donor.id}.`);
-    
-    // Step 3: Increment the donor's donation record.
+
+    // Step 5: Increment the donor's donation record.
     await incrementDonationRecord(donor.id);
 
-    // Step 4: Trigger the global matching algorithm asynchronously.
+    // Step 6: Trigger the global matching algorithm asynchronously.
     runGlobalMatching().catch(console.error);
-
-    // Step 5: (Optional but recommended) Update the lab test to mark it as used.
-    // This prevents a single passed test from being used for multiple donations.
 
     return donationDocRef;
 }
