@@ -18,7 +18,7 @@ import { updateRequestAfterMatching } from './request.service.js';
  * @param {object} recipient - The recipient's blood profile.
  * @param {string} recipient.abo - The recipient's ABO blood type.
  * @param {string} recipient.rh - The recipient's Rh factor.
- * @param {string[]} [recipient.unexpectedAntibodies] - A list of the recipient's unexpected antibodies.
+ * @param {string[]} [recipient.currentAntibodies] - A list of the recipient's current antibodies.
  * @param {boolean} [recipient.requiresCmvNegative] - Whether the recipient requires CMV negative blood.
  * @param {boolean} [recipient.requiresSickleCellNegative] - Whether the recipient requires Sickle Cell negative blood.
  * @param {object} donor - The donor's blood profile.
@@ -53,11 +53,11 @@ export function isCompatible(recipient, donor) {
     }
 
     // Alloantibody compatibility
-    if (recipient.unexpectedAntibodies && recipient.unexpectedAntibodies.length > 0) {
+    if (recipient.currentAntibodies && recipient.currentAntibodies.length > 0) {
         if (!donor.minorAntigens || donor.minorAntigens.length === 0) {
             return false; // Cannot confirm compatibility if donor antigens are unknown
         }
-        const hasIncompatibleAntigen = recipient.unexpectedAntibodies.some(antibody => {
+        const hasIncompatibleAntigen = recipient.currentAntibodies.some(antibody => {
             const antigenSymbol = antibody.replace('Anti-', '').toUpperCase();
             return donor.minorAntigens.some(minorAntigen => minorAntigen.toUpperCase() === antigenSymbol);
         });
@@ -150,7 +150,7 @@ export function findCompatibleBloodBags(patient, bloodBags, specialRequirements 
     const recipientProfile = {
         abo: patient.bloodGroup,
         rh: patient.rhFactor,
-        unexpectedAntibodies: patient.antibody_history || [],
+        currentAntibodies: patient.currentAntibodies || [], // Use currentAntibodies
         requiresCmvNegative: specialRequirements.includes('CMV Negative'),
         requiresSickleCellNegative: specialRequirements.includes('Sickle Cell Negative'),
     };

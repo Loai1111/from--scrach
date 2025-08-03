@@ -358,11 +358,27 @@ function renderRequestDetails(item) {
 function renderPatientDetails(item) {
     const bloodGroup = `${item.bloodGroup || ''}${item.rhFactor || ''}`;
 
-    const renderAntibodies = (antibodies) => {
+    const renderCurrentAntibodies = (antibodies) => {
         if (!antibodies || antibodies.length === 0) {
-            return '<span class="val">N/A</span>';
+            return '<span class="val">None</span>';
         }
-        return `<div class="mt-1 flex flex-wrap gap-2">${antibodies.map(ab => `<span class="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-1 rounded-full">${ab}</span>`).join('')}</div>`;
+        return `<span class="val">${antibodies.join(', ')}</span>`;
+    };
+
+    const renderAntibodyHistory = (history) => {
+        if (!history || history.length === 0) {
+            return '<span class="val">None</span>';
+        }
+        const formattedHistory = history
+            .map(h => {
+                if (!h || !h.antibody) return null;
+                const date = h.dateDetected ? safeFormatDate(h.dateDetected) : 'N/A';
+                return `${h.antibody} (${date})`;
+            })
+            .filter(Boolean)
+            .join(', ');
+
+        return `<span class="val">${formattedHistory || 'None'}</span>`;
     };
 
     const renderAntigens = (antigens) => {
@@ -379,15 +395,12 @@ function renderPatientDetails(item) {
             <div><span class="lbl">Full Name</span><span class="val">${item.fullName}</span></div>
             <div><span class="lbl">Age</span><span class="val">${calculateAge(item.dob)}</span></div>
             <div><span class="lbl">Sex</span><span class="val">${item.sex}</span></div>
-            <div><span class="lbl">Blood Type</span><span class="val">${bloodGroup}</span></div>
-            <div><span class="lbl">Unexpected Antibodies</span>${renderAntibodies(item.unexpectedAntibodies)}</div>
-            <div><span class="lbl">Antigen Profile</span>${renderAntigens(item.antigen_profile)}</div>
-            <div><span class="lbl">Antibody History</span>${renderAntibodies(item.antibody_history)}</div>
+            <div><span class="lbl">Blood Type</span><span class="val">${item.bloodType}</span></div>
+            <div><span class="lbl">Current Antibodies</span>${renderCurrentAntibodies(item.currentAntibodies)}</div>
+            <div><span class="lbl">Antibody History</span>${renderAntibodyHistory(item.antibodyHistory)}</div>
         </div>
         <div id="details-actions" class="mt-6 pt-6 border-t space-y-2">
             <button id="edit-patient-btn" class="w-full bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700">Edit Patient</button>
-            <button id="blood-test-btn" class="w-full bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 mt-2">Record Blood Test</button>
-            <button id="find-match-btn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 mt-2">Find Match</button>
         </div>
     `;
 }

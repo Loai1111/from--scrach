@@ -7,6 +7,7 @@ import * as state from './state.js';
 import { getDonor } from '../../services/donor.service.js';
 import { getHealthScreening } from '../../services/healthscreening.service.js';
 import { markAsRead } from '../../services/notification.service.js';
+import { createAntibodyButtonsUI, initAntibodyButtonsUI, setSelectedAntibodies } from '../shared/antigenAntibody.js';
 
 // --- DOM Element References ---
 let navLinks, pageTitle, pageActions, mainContent, testsPageContent, detailsPanel, testsDetailsPanel;
@@ -47,18 +48,21 @@ export function init() {
         screening: document.querySelector('[data-tab-content="screening"]'),
         lab: document.querySelector('[data-tab-content="lab"]'),
         crossmatching: document.querySelector('[data-tab-content="crossmatching"]'),
+        antibody: document.querySelector('[data-tab-content="antibody"]'),
     };
     testTableHeads = {
         questionnaire: document.getElementById('questionnaire-table-head'),
         screening: document.getElementById('screening-table-head'),
         lab: document.getElementById('lab-table-head'),
         crossmatching: document.getElementById('crossmatching-table-head'),
+        antibody: document.getElementById('antibody-table-head'),
     };
     testTableBodies = {
         questionnaire: document.getElementById('questionnaire-table-body'),
         screening: document.getElementById('screening-table-body'),
         lab: document.getElementById('lab-table-body'),
         crossmatching: document.getElementById('crossmatching-table-body'),
+        antibody: document.getElementById('antibody-table-body'),
     };
 
     // Modals
@@ -255,6 +259,7 @@ function getRenderFunctionForView(view) {
         screening: renderScreeningTable,
         lab: renderLabTestTable,
         crossmatching: renderCrossmatchingTable,
+        antibody: renderAntibodyScreeningTable,
         notifications: renderNotifications,
     };
     const func = viewMap[view];
@@ -375,6 +380,30 @@ async function renderCrossmatchingTable() {
     }));
 
     body.innerHTML = rows.join('');
+    head.querySelectorAll('.th').forEach(th => th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase');
+}
+
+async function renderAntibodyScreeningTable() {
+    const head = testTableHeads.antibody;
+    const body = testTableBodies.antibody;
+    head.innerHTML = `<tr><th class="th">Patient</th><th class="th">Detected Antibodies</th><th class="th">Date</th></tr>`;
+    
+    const data = state.filteredPageData;
+    if (data.length === 0) {
+        body.innerHTML = `<tr><td colspan="3" class="p-6 text-center text-gray-500">No antibody screening tests match the current filter.</td></tr>`;
+    } else {
+        const rows = await Promise.all(data.map(async (test) => {
+            const patientName = getPatientName(test.patientId);
+            const antibodies = test.result?.antibodiesDetected && test.result.antibodiesDetected.length > 0 ? test.result.antibodiesDetected.join(', ') : 'None';
+            return `
+                <tr class="hover:bg-red-50 cursor-pointer" data-id="${test.id}">
+                    <td class="px-6 py-4">${patientName}</td>
+                    <td class="px-6 py-4">${antibodies}</td>
+                    <td class="px-6 py-4">${safeFormatDate(test.createdAt)}</td>
+                </tr>`;
+        }));
+        body.innerHTML = rows.join('');
+    }
     head.querySelectorAll('.th').forEach(th => th.className = 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase');
 }
 
@@ -507,12 +536,40 @@ async function renderDetailsPanel() {
     // Generate details content based on the view
     switch (state.currentView) {
         case 'requests':
+            const patient = state.patientsCache.find(p => p.id === selectedItem.patientId);
+            const patientName = patient ? patient.fullName : 'Unknown Patient';
+            const bloodTypeConfirmed = patient ? patient.bloodTypeConfirmed : false;
+            const currentAntibodies = patient ? patient.currentAntibodies || [] : [];
+            const antibodyHistory = patient ? patient.antibodyHistory || [] : [];
             content = `
-                <h3 class="font-bold text-lg mb-4">Request Details</h3>
-                <div class="space-y-2 text-sm">
+                <div class="p-4 border-b">
+                    <h3 class="font-bold text-lg">${patientName}</h3>
+                    <p class="text-sm text-gray-500">Patient ID: ${selectedItem.patientId}</p>
+                </div>
+                <div class="p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-semibold">Blood Type: ${patient ? patient.bloodType : 'N/A'}</h4>
+                        <span id="blood-type-status" class="px-2 py-1 text-xs font-semibold rounded-full ${bloodTypeConfirmed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                            ${bloodTypeConfirmed ? 'Confirmed' : 'Unconfirmed'}
+                        </span>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold mb-2">Current Antibodies</h4>
+                        <div id="current-antibodies-list" class="flex flex-wrap gap-2">
+                            ${currentAntibodies.length > 0 ? currentAntibodies.map(ab => `<span class="bg-red-100 text-red-800 px-2 py-1 rounded">${ab}</span>`).join('') : '<span class="text-sm text-gray-500">None</span>'}
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <h4 class="font-semibold mb-2">Antibody History</h4>
+                        <ul id="antibody-history-list" class="space-y-2">
+                            ${antibodyHistory.length > 0 ? antibodyHistory.map(h => `<li class="text-sm"><strong>${h.antibody}</strong> - Detected on ${safeFormatDate(h.dateDetected)}</li>`).join('') : '<li class="text-sm text-gray-500">No history</li>'}
+                        </ul>
+                    </div>
+                </div>
+                <hr class="my-4">
+                <h3 class="font-bold text-lg mb-4 p-4 border-t">Request Details</h3>
+                <div class="space-y-2 text-sm p-4">
                     <p><strong>ID:</strong> <span class="font-mono text-xs">${selectedItem.id}</span></p>
-                    <p><strong>Patient ID:</strong> <span class="font-mono text-xs">${selectedItem.patientId}</span></p>
-                    <p><strong>Blood Type:</strong> ${selectedItem.bloodType}</p>
                     <p><strong>Quantity:</strong> ${selectedItem.matchedCount || 0} Matched / ${selectedItem.allocatedCount || 0} Allocated / ${selectedItem.quantity} Required</p>
                     <p><strong>Status:</strong> ${getStatusBadge(selectedItem.status)}</p>
                     <p><strong>Created:</strong> ${safeFormatDate(selectedItem.createdAt)}</p>
@@ -542,7 +599,9 @@ async function renderDetailsPanel() {
                     <p><strong>Blood Type:</strong> ${selectedItem.bloodType}</p>
                     <p><strong>Donations:</strong> ${selectedItem.donationRecord}</p>
                     <p><strong>Status:</strong> ${getStatusBadge(selectedItem.disqualificationStatus || 'Eligible')}</p>
-                    <p><strong>Antibody History:</strong> ${(selectedItem.antibody_history || []).join(', ') || 'N/A'}</p>
+                    <p><strong>Blood Type Confirmed:</strong> ${selectedItem.bloodTypeConfirmed ? getStatusBadge('Success') : getStatusBadge('Pending')}</p>
+                    <p><strong>Current Antibodies:</strong> ${(selectedItem.currentAntibodies || []).join(', ') || 'N/A'}</p>
+                    <p><strong>Antibody History:</strong> ${(selectedItem.antibodyHistory || []).map(h => `${h.antibody} (${safeFormatDate(h.dateDetected)})`).join(', ') || 'N/A'}</p>
                 </div>
                 <div class="mt-6">
                     <button id="edit-donor-btn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">Edit Donor</button>
@@ -632,12 +691,19 @@ async function renderTestDetailsPanel() {
                     <p><strong>Result:</strong> ${getStatusBadge(selectedItem.result)}</p>
                     <p><strong>Date:</strong> ${safeFormatDate(selectedItem.createdAt)}</p>
                     <hr class="my-4">
+                    <h4 class="font-semibold">Antigen Profile</h4>
+                    <p>${(selectedItem.antigenProfile || []).join(', ') || 'N/A'}</p>
+                    <hr class="my-4">
                     <p><strong>Hemoglobin:</strong> ${selectedItem.bloodLevels.hemoglobin} g/dL</p>
                     <p><strong>Hematocrit:</strong> ${selectedItem.bloodLevels.hematocrit} %</p>
                     <hr class="my-4">
                     <p><strong>Hepatitis B:</strong> ${getStatusBadge(selectedItem.viralMarkers.hepatitisB)}</p>
                     <p><strong>Hepatitis C:</strong> ${getStatusBadge(selectedItem.viralMarkers.hepatitisC)}</p>
                     <p><strong>HIV/AIDS:</strong> ${getStatusBadge(selectedItem.viralMarkers.hivAids)}</p>
+                    <hr class="my-4">
+                    <h4 class="font-semibold">Special Status Markers</h4>
+                    <p><strong>CMV Status:</strong> ${getStatusBadge(selectedItem.cmvStatus)}</p>
+                    <p><strong>Sickle Cell Status:</strong> ${getStatusBadge(selectedItem.sickleCellStatus)}</p>
                 </div>
             `;
             break;
@@ -664,6 +730,26 @@ async function renderTestDetailsPanel() {
                     <p><strong>Bag ID:</strong> <span class="font-mono text-xs">${selectedItem.bloodBagId}</span></p>
                     <p><strong>Blood Type:</strong> ${inventoryItem ? inventoryItem.bloodType : 'N/A'}</p>
                     <p><strong>Donor:</strong> ${donorNameFromInventory}</p>
+                </div>
+            `;
+            break;
+        case 'antibody':
+            const patientNameForAntibody = getPatientName(selectedItem.patientId);
+            const detectedAntibodies = selectedItem.result?.antibodiesDetected && selectedItem.result.antibodiesDetected.length > 0
+                ? selectedItem.result.antibodiesDetected.map(ab => `<span class="bg-red-100 text-red-800 px-2 py-1 rounded">${ab}</span>`).join(' ')
+                : '<span class="text-sm text-gray-500">None</span>';
+
+            content = `
+                <h3 class="font-bold text-lg mb-4">Antibody Screening Details</h3>
+                <div class="space-y-2 text-sm">
+                    <p><strong>Test ID:</strong> <span class="font-mono text-xs">${selectedItem.id}</span></p>
+                    <p><strong>Patient:</strong> ${patientNameForAntibody}</p>
+                    <p><strong>Date:</strong> ${safeFormatDate(selectedItem.createdAt)}</p>
+                    <hr class="my-4">
+                    <h4 class="font-semibold mb-2">Detected Antibodies</h4>
+                    <div class="flex flex-wrap gap-2">
+                        ${detectedAntibodies}
+                    </div>
                 </div>
             `;
             break;
@@ -716,6 +802,83 @@ export function renderQuestionnaireQuestions(questionnaireConfig) {
             </div>
         </div>
     `).join('');
+}
+
+function renderAntibodyHistory(patient) {
+    const historyContainer = document.getElementById('a-antibody-history-display');
+    if (!historyContainer) return;
+
+    const antibodyHistory = patient.antibodyHistory || [];
+
+    if (antibodyHistory.length > 0) {
+        const historyList = antibodyHistory.map(h =>
+            `<li class="flex justify-between items-center p-2 bg-gray-100 rounded-md">
+                <span class="font-semibold">${h.antibody}</span>
+                <span class="text-xs text-gray-500">Detected: ${safeFormatDate(h.dateDetected)}</span>
+            </li>`
+        ).join('');
+        historyContainer.innerHTML = `<ul class="space-y-2">${historyList}</ul>`;
+    } else {
+        historyContainer.innerHTML = '<p>No antibody history found for this patient.</p>';
+    }
+}
+
+function renderCurrentAntibodySelection() {
+    const selectionContainer = document.getElementById('a-current-antibody-selection');
+    if (!selectionContainer) return;
+
+    // Use the shared function to create the buttons
+    selectionContainer.innerHTML = createAntibodyButtonsUI('a-current');
+    
+    // Initialize the logic for the newly created buttons
+    initAntibodyButtonsUI('a-current');
+}
+
+function populateBloodTypeDropdown(patient) {
+    const select = document.getElementById('antibody-blood-type');
+    if (!select) return;
+
+    // Clear existing options
+    select.innerHTML = '';
+
+    // Create and add the patient's blood type as the selected, readonly option
+    const option = document.createElement('option');
+    option.value = patient.bloodType;
+    option.textContent = patient.bloodType;
+    option.selected = true;
+    select.appendChild(option);
+
+    // Make the select element readonly
+    select.disabled = true;
+
+    // Enable the submit button
+    const submitBtn = document.querySelector('#antibody-form button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+    }
+}
+
+
+export function showSelectedPatientForAntibody() {
+    const patient = state.selectedPatientForAntibody;
+    if (!patient) return;
+
+    // Show patient details
+    document.getElementById('a-selected-patient-name').textContent = patient.fullName;
+    document.getElementById('a-selected-patient-info').textContent = `ID: ${patient.id} | Type: ${patient.bloodType}`;
+    document.getElementById('a-patient-search-component').classList.add('hidden');
+    document.getElementById('a-selected-patient-display').classList.remove('hidden');
+    document.getElementById('a-patient-search-results').classList.add('hidden');
+
+    // Render the UI components
+    renderAntibodyHistory(patient);
+    renderCurrentAntibodySelection();
+    populateBloodTypeDropdown(patient);
+
+    // Pre-select any current antibodies if they exist
+    if (patient.currentAntibodies) {
+        setSelectedAntibodies('a-current', patient.currentAntibodies);
+    }
 }
 
 export function showSelectedDonorForQuestionnaire() {

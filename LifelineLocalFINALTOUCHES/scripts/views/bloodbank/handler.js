@@ -10,7 +10,7 @@ import * as services from '../../services/index.js';
 import * as ui from './ui.js';
 import * as state from './state.js';
 import { validatePhoneNumber, isAdult, isPastDate, bloodCompatibility } from '../../utils.js';
-import { createAntigenAntibodyUI, initAntigenAntibodyUI, setSelectedButtons, getSelectedValues } from '../shared/antigenAntibody.js';
+import { createAntigenAntibodyUI, initAntigenAntibodyUI, setSelectedButtons, getSelectedValues, getSelectedAntibodies } from '../shared/antigenAntibody.js';
 
 // =================================================================
 // --- CONFIGURATION & CONSTANTS ---
@@ -142,7 +142,8 @@ async function fetchAllTestData() {
     state.setState('allDonorsCache', donors);
     state.setState('allQuestionnairesCache', questionnaires);
     state.setState('allScreeningsCache', screenings);
-    state.setState('allLabTestsCache', labTests);
+    state.setState('allLabTestsCache', labTests.filter(t => t.testType !== 'ANTIBODY_SCREENING'));
+    state.setState('allAntibodyTestsCache', labTests.filter(t => t.testType === 'ANTIBODY_SCREENING'));
     state.setState('allCrossmatchesCache', crossmatches);
     state.setState('allRequestsCache', requests);
     state.setState('patientsCache', patients);
@@ -351,6 +352,16 @@ function handleAddTestClick() {
                 // If no test is selected, we need to create a new crossmatch request
                 // This would typically be initiated from a blood request
                 alert('Please select a blood request to initiate crossmatching.');
+            }
+            break;
+        case 'antibody':
+            formIdToShow = 'antibody-form';
+            // The antibody selection UI is now rendered dynamically after a patient is selected.
+            // No need to initialize it here.
+            // Ensure submit button is disabled initially
+            const submitBtn = document.querySelector('#antibody-form button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
             }
             break;
     }
@@ -846,6 +857,81 @@ function handleClearScreeningSelection() {
     document.getElementById('l-s-search').value = '';
 }
 
+function handleAntibodyPatientSearchInput(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    const resultsContainer = document.getElementById('a-patient-search-results');
+    if (searchTerm.length < 2) {
+        resultsContainer.classList.add('hidden');
+        return;
+    }
+    const results = state.patientsCache.filter(p => {
+        const name = p.fullName || '';
+        return name.toLowerCase().includes(searchTerm) || p.id.toLowerCase().includes(searchTerm);
+    });
+    resultsContainer.innerHTML = results.length ? results.map(p => `<div class="p-3 hover:bg-red-50 cursor-pointer" data-id="${p.id}">${p.fullName} (${p.bloodType})</div>`).join('') : '<div class="p-3 text-gray-500">No patients found.</div>';
+    resultsContainer.classList.remove('hidden');
+}
+
+function handleSelectPatientForAntibody(e) {
+    const target = e.target.closest('[data-id]');
+    if (!target) return;
+    const patient = state.patientsCache.find(p => p.id === target.dataset.id);
+    state.setState('selectedPatientForAntibody', patient);
+    ui.showSelectedPatientForAntibody();
+}
+
+function handleClearPatientSelectionForAntibody() {
+    state.setState('selectedPatientForAntibody', null);
+    document.getElementById('a-patient-search-component').classList.remove('hidden');
+    document.getElementById('a-selected-patient-display').classList.add('hidden');
+    document.getElementById('a-patient-search').value = '';
+
+    // Disable the submit button when the selection is cleared
+    const submitBtn = document.querySelector('#antibody-form button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+    }
+}
+
+async function handleAntibodyFormSubmit(e) {
+    e.preventDefault();
+    const patient = state.selectedPatientForAntibody;
+    if (!patient) {
+        alert("Please select a patient first.");
+        return;
+    }
+
+    const selectedBloodType = document.getElementById('antibody-blood-type').value;
+    const antibodies = getSelectedAntibodies('a-current');
+
+    try {
+        await services.labTest.addAntibodyScreeningTest({
+            testType: 'ANTIBODY_SCREENING',
+            patientId: patient.id,
+            hospitalId: 'some-hospital-id', // This should be dynamic in a real app
+            result: {
+                bloodGroup: selectedBloodType.slice(0, -1),
+                rhFactor: selectedBloodType.slice(-1),
+                antibodiesDetected: antibodies,
+            },
+        });
+
+        await services.patient.updatePatient(patient.id, {
+            bloodType: selectedBloodType,
+            bloodTypeConfirmed: true,
+            currentAntibodies: antibodies,
+            // Logic for antibodyHistory would be more complex, handled server-side or in a dedicated service
+        });
+
+        alert(`Antibody test for ${patient.fullName} submitted.`);
+        ui.hideTestFormModal();
+        fetchAndDisplayData();
+    } catch (error) {
+        console.error("Error submitting antibody test:", error);
+        alert("An error occurred during antibody test submission.");
+    }
+}
+
 
 // =================================================================
 // --- TEST FORM SUBMISSION LOGIC ---
@@ -1062,26 +1148,50 @@ function initializeEventListeners() {
     document.getElementById('clear-lab-test-selection-btn').addEventListener('click', handleClearLabTestSelection);
 
     // Tests Page
-    document.getElementById('tests-tabs').addEventListener('click', handleTestTabClick);
-   document.getElementById('tests-tab-content').addEventListener('click', (e) => {
-       const actionBtn = e.target.closest('.crossmatch-action-btn');
-       if (actionBtn) {
-           const { testId, bloodBagId, action } = actionBtn.dataset;
-           if (testId && bloodBagId && action) {
-               handleCrossmatchAction(testId, bloodBagId, action);
-           }
-           return;
-       }
-       handleTestTableClick(e);
-   });
-    document.getElementById('add-test-btn').addEventListener('click', handleAddTestClick);
+    // Consolidated event listener for the entire tests page using event delegation
+    document.getElementById('tests-page-content').addEventListener('click', (e) => {
+        const target = e.target;
+
+        // Handle "Add New Test" button click
+        if (target.closest('#add-test-btn')) {
+            handleAddTestClick();
+            return;
+        }
+
+        // Handle tab clicks
+        const clickedTab = target.closest('.tab-link');
+        if (clickedTab) {
+            handleTestTabClick(e);
+            return;
+        }
+
+        // Handle clicks inside tab content (tables, etc.)
+        const crossmatchBtn = target.closest('.crossmatch-action-btn');
+        if (crossmatchBtn) {
+            const { testId, bloodBagId, action } = crossmatchBtn.dataset;
+            if (testId && bloodBagId && action) {
+                handleCrossmatchAction(testId, bloodBagId, action);
+            }
+            return;
+        }
+
+        const tableRow = target.closest('tr[data-id]');
+        if (tableRow) {
+            handleTestTableClick(e);
+            return;
+        }
+    });
     
     // Test Form Submissions (now in a modal)
     document.getElementById('questionnaire-form').addEventListener('submit', handleQuestionnaireSubmit);
     document.getElementById('screening-form').addEventListener('submit', handleScreeningSubmit);
     document.getElementById('lab-form').addEventListener('submit', handleLabTestSubmit);
+    document.getElementById('antibody-form').addEventListener('submit', handleAntibodyFormSubmit);
 
     // Test Form Search/Select Logic (RESTORED)
+    document.getElementById('a-patient-search').addEventListener('input', handleAntibodyPatientSearchInput);
+    document.getElementById('a-patient-search-results').addEventListener('click', handleSelectPatientForAntibody);
+    document.getElementById('a-clear-patient-selection-btn').addEventListener('click', handleClearPatientSelectionForAntibody);
     document.getElementById('q-donor-search').addEventListener('input', handleQuestionnaireSearchInput);
     document.getElementById('q-donor-search-results').addEventListener('click', handleSelectDonorForQuestionnaire);
     document.getElementById('q-clear-donor-selection-btn').addEventListener('click', handleClearDonorSelectionForQuestionnaire);

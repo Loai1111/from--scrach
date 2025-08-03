@@ -84,6 +84,7 @@
                                 <a href="#" data-tab="screening" class="tab-link px-4 py-2 font-semibold text-sm rounded-md border-b-2 border-transparent">Health Screening</a>
                                 <a href="#" data-tab="lab" class="tab-link px-4 py-2 font-semibold text-sm rounded-md border-b-2 border-transparent">Lab Test</a>
                                 <a href="#" data-tab="crossmatching" class="tab-link px-4 py-2 font-semibold text-sm rounded-md border-b-2 border-transparent">Crossmatching</a>
+                                <a href="#" data-tab="antibody" class="tab-link px-4 py-2 font-semibold text-sm rounded-md border-b-2 border-transparent">Antibody Screening</a>
                             </nav>
                             <div id="tests-page-actions">
                                  <button id="add-test-btn" class="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 text-sm">Add New Test</button>
@@ -107,7 +108,10 @@
                             <div data-tab-content="crossmatching" class="hidden">
                                 <!-- This table will be populated by ui.js with pending crossmatches -->
                                 <table class="min-w-full"><thead class="bg-gray-50 sticky top-0"><tr id="crossmatching-table-head"></tr></thead><tbody id="crossmatching-table-body" class="bg-white divide-y divide-gray-200"></tbody></table>
-                            </div>
+                           </div>
+                           <div data-tab-content="antibody" class="hidden">
+                               <table class="min-w-full"><thead class="bg-gray-50 sticky top-0"><tr id="antibody-table-head"></tr></thead><tbody id="antibody-table-body" class="bg-white divide-y divide-gray-200"></tbody></table>
+                           </div>
                         </div>
                     </div>
                 </div>
@@ -448,6 +452,59 @@
                     <div class="flex justify-end space-x-4 pt-4">
                         <button type="button" class="bg-gray-200 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-300" onclick="document.getElementById('test-forms-modal').classList.add('opacity-0', 'pointer-events-none')">Cancel</button>
                         <button type="submit" class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700">Submit Lab Test</button>
+                    </div>
+                </form>
+                <!-- Antibody Screening Form -->
+                <form id="antibody-form" class="space-y-8 hidden">
+                    <h3 class="text-xl font-bold text-gray-800 border-b pb-4">Antibody Screening</h3>
+                    
+                    <!-- Patient Selection -->
+                    <div class="form-section p-4 bg-gray-50 rounded-lg">
+                        <h4 class="font-semibold text-gray-700 mb-2">Step 1: Select Patient</h4>
+                        <div id="a-patient-search-component">
+                            <label for="a-patient-search" class="block text-sm font-medium text-gray-700">Search for Patient (by Name or ID)</label>
+                            <div class="relative mt-1">
+                                <input type="text" id="a-patient-search" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Start typing...">
+                                <div id="a-patient-search-results" class="absolute z-10 w-full bg-white border border-gray-300 rounded-b-lg max-h-48 overflow-y-auto hidden"></div>
+                            </div>
+                        </div>
+                        <div id="a-selected-patient-display" class="hidden">
+                            <label class="block text-sm font-medium text-gray-500">Selected Patient</label>
+                            <div class="mt-1 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+                                <div>
+                                    <p id="a-selected-patient-name" class="font-semibold text-gray-800"></p>
+                                    <p id="a-selected-patient-info" class="text-sm text-gray-600"></p>
+                                </div>
+                                <button type="button" id="a-clear-patient-selection-btn" class="text-gray-500 hover:text-red-600"><i class="ph-bold ph-x-circle text-xl"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Antibody History (Read-only) -->
+                    <div class="form-section p-4 bg-gray-50 rounded-lg">
+                        <h4 class="font-semibold text-gray-700 mb-2">Antibody History</h4>
+                        <div id="a-antibody-history-display" class="text-sm text-gray-600">
+                            <p>Select a patient to view their antibody history.</p>
+                        </div>
+                    </div>
+
+                    <!-- Current Antibody Screening -->
+                    <div class="form-section p-4 bg-gray-50 rounded-lg">
+                        <h4 class="font-semibold text-gray-700 mb-4">Step 2: Record Current Screening Results</h4>
+                        <div id="a-current-antibody-selection">
+                            <!-- Interactive antibody buttons will be rendered here -->
+                        </div>
+                        <div class="mt-4">
+                            <label for="antibody-blood-type" class="block text-sm font-medium text-gray-700">Confirm Patient Blood Type</label>
+                            <select id="antibody-blood-type" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100" readonly>
+                                <!-- This will be populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-4 pt-4">
+                        <button type="button" class="bg-gray-200 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-300" onclick="document.getElementById('test-forms-modal').classList.add('opacity-0', 'pointer-events-none')">Cancel</button>
+                        <button type="submit" class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 disabled:bg-gray-400" disabled>Submit Test</button>
                     </div>
                 </form>
             </div>

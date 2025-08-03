@@ -23,6 +23,7 @@ export let allQuestionnairesCache = [];
 export let allScreeningsCache = [];
 export let allLabTestsCache = [];
 export let allCrossmatchesCache = []; // NEW: Cache for crossmatch tests
+export let allAntibodyTestsCache = [];
 export let availableLabTestsCache = []; // FIX: Add cache for available tests for donation
 
 // --- Testing Module State ---
@@ -34,6 +35,7 @@ export let selectedDonorForQuestionnaire = null;
 export let selectedQuestionnaireForScreening = null;
 export let selectedScreeningForLabTest = null;
 export let selectedTestItemId = null;
+export let selectedPatientForAntibody = null;
 
 export function getSelectedTestItem() {
     if (!selectedTestItemId) return null;
@@ -46,6 +48,8 @@ export function getSelectedTestItem() {
             return allLabTestsCache.find(item => item.id === selectedTestItemId);
         case 'crossmatching':
             return allCrossmatchesCache.find(item => item.id === selectedTestItemId);
+        case 'antibody':
+            return allAntibodyTestsCache.find(item => item.id === selectedTestItemId);
         default:
             return null;
     }
@@ -60,6 +64,8 @@ export function getCurrentTestTabData() {
             return allLabTestsCache;
         case 'crossmatching':
             return allCrossmatchesCache;
+        case 'antibody':
+            return allAntibodyTestsCache;
         default:
             return [];
     }
@@ -89,6 +95,7 @@ export function setState(key, value) {
         case 'allScreeningsCache': allScreeningsCache = value; break;
         case 'allLabTestsCache': allLabTestsCache = value; break;
         case 'allCrossmatchesCache': allCrossmatchesCache = value; break; // NEW
+        case 'allAntibodyTestsCache': allAntibodyTestsCache = value; break;
         case 'availableLabTestsCache': availableLabTestsCache = value; break; // FIX
 
         // Testing Page
@@ -100,6 +107,7 @@ export function setState(key, value) {
         case 'selectedQuestionnaireForScreening': selectedQuestionnaireForScreening = value; break;
         case 'selectedScreeningForLabTest': selectedScreeningForLabTest = value; break;
         case 'selectedTestItemId': selectedTestItemId = value; break;
+        case 'selectedPatientForAntibody': selectedPatientForAntibody = value; break;
 
         default:
             console.error(`Unknown state key: ${key}`);

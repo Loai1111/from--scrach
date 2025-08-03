@@ -5,7 +5,18 @@
  */
 
 import { db } from '../firebase-config.js';
-import { collection, getDocs, addDoc, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import {
+    collection,
+    getDocs,
+    addDoc,
+    doc,
+    getDoc,
+    updateDoc,
+    serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import {
+    getAntibodyScreeningTestsByPatientId
+} from './labTest.service.js';
 
 /**
  * Fetches all documents from the 'patients' collection.
@@ -45,8 +56,10 @@ export async function addPatient(patientData) {
         bloodGroup,
         rhFactor,
         bloodType: `${bloodGroup}${rhFactor}`,
-        antibody_history: [], // This will be populated during blood tests
-        lastBloodTest: null, // This will be updated when blood tests are performed
+        bloodTypeConfirmed: false, // Default to false
+        currentAntibodies: [], // New field for active antibodies
+        antibodyHistory: [], // New field for historical antibody data
+        lastBloodTest: null,
         createdAt: serverTimestamp()
     };
 
@@ -62,7 +75,45 @@ export async function addPatient(patientData) {
  */
 export async function updatePatient(patientId, updatedData) {
     const patientRef = doc(db, 'patients', patientId);
-    await setDoc(patientRef, updatedData, { merge: true });
+
+    // a. Fetch the complete, current patient document from Firestore.
+    const patientSnap = await getDoc(patientRef);
+    if (!patientSnap.exists()) {
+        console.error("No such patient document!");
+        return;
+    }
+    const currentPatientData = patientSnap.data();
+
+    // b. From the fetched document, get the existing antibodyHistory array.
+    const antibodyHistory = currentPatientData.antibodyHistory || [];
+
+    // c. Check if the incoming updatedData contains a currentAntibodies array.
+    if (updatedData.currentAntibodies && Array.isArray(updatedData.currentAntibodies)) {
+        // d. Iterate through each antibody in updatedData.currentAntibodies.
+        updatedData.currentAntibodies.forEach(antibodyName => {
+            // e. For each antibody, check if an object with that same antibody value already exists.
+            const alreadyExists = antibodyHistory.some(
+                (historyItem) => historyItem.antibody === antibodyName
+            );
+
+            // f. If it does not exist, add a new object.
+            if (!alreadyExists) {
+                antibodyHistory.push({
+                    antibody: antibodyName,
+                    dateDetected: new Date(),
+                });
+            }
+        });
+    }
+
+    // g. After the loop is complete, create the object for the update call.
+    const finalUpdateData = {
+        ...updatedData,
+        antibodyHistory: antibodyHistory,
+    };
+
+    // h. Proceed with the updateDoc call using the modified data.
+    await updateDoc(patientRef, finalUpdateData);
     console.log(`Successfully updated patient: ${patientId}`);
 }
 
@@ -75,6 +126,7 @@ export async function getPatientById(patientId) {
     try {
         const patientRef = doc(db, 'patients', patientId);
         const docSnap = await getDoc(patientRef);
+
         if (docSnap.exists()) {
             return { id: docSnap.id, ...docSnap.data() };
         } else {

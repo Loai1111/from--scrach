@@ -31,20 +31,52 @@ export async function getLabTests() {
  * @returns {Promise<string>} The ID of the newly created document.
  */
 export async function addLabTest(testData) {
+    if (testData.testType === 'ANTIBODY_SCREENING') {
+        return addAntibodyScreeningTest(testData);
+    }
+
     if (!testData.healthScreeningId || !testData.donorId || !testData.result || !testData.bloodLevels || !testData.viralMarkers) {
-        throw new Error("Health Screening ID, Donor ID, result, blood levels, and viral markers are required to create a lab test.");
+        throw new Error("Health Screening ID, Donor ID, result, blood levels, and viral markers are required to create a standard lab test.");
     }
 
     const newTest = {
         ...testData,
-        antigen_profile: testData.antigen_profile || [], // Include antigen information from the lab test
-        cmvStatus: testData.cmvStatus || 'Unknown', // CMV status: Positive, Negative, or Unknown
-        sickleCellStatus: testData.sickleCellStatus || 'Unknown', // Sickle Cell status: Positive, Negative, or Unknown
+        antigen_profile: testData.antigen_profile || [],
+        cmvStatus: testData.cmvStatus || 'Unknown',
+        sickleCellStatus: testData.sickleCellStatus || 'Unknown',
         createdAt: serverTimestamp()
     };
 
     const docRef = await addDoc(collection(db, 'labTests'), newTest);
     console.log(`Successfully added lab test with ID: ${docRef.id}`);
+    return docRef.id;
+}
+
+/**
+ * Adds a new antibody screening test document to the 'labTests' collection for a patient.
+ * @param {object} testData - The data for the new antibody screening test.
+ * @returns {Promise<string>} The ID of the newly created document.
+ */
+export async function addAntibodyScreeningTest(testData) {
+    if (!testData.patientId || !testData.hospitalId) {
+        throw new Error("Patient ID and Hospital ID are required for an antibody screening test.");
+    }
+
+    const newTest = {
+        testType: 'ANTIBODY_SCREENING',
+        patientId: testData.patientId,
+        hospitalId: testData.hospitalId,
+        status: 'Pending',
+        result: {
+            bloodGroup: testData.result?.bloodGroup || null,
+            rhFactor: testData.result?.rhFactor || null,
+            antibodiesDetected: testData.result?.antibodiesDetected || []
+        },
+        createdAt: serverTimestamp()
+    };
+
+    const docRef = await addDoc(collection(db, 'labTests'), newTest);
+    console.log(`Successfully added antibody screening test with ID: ${docRef.id}`);
     return docRef.id;
 }
 
@@ -116,5 +148,30 @@ export async function getLabTestById(labTestId) {
     } catch (error) {
         console.error("Error fetching lab test by ID:", error);
         return null;
+    }
+}
+
+/**
+ * Fetches all antibody screening tests for a specific patient.
+ * @param {string} patientId - The ID of the patient.
+ * @returns {Promise<Array>} A promise that resolves to an array of antibody screening test objects.
+ */
+export async function getAntibodyScreeningTestsByPatientId(patientId) {
+    try {
+        const testsCollection = collection(db, 'labTests');
+        const q = query(
+            testsCollection,
+            where("patientId", "==", patientId),
+            where("testType", "==", "ANTIBODY_SCREENING")
+        );
+        const querySnapshot = await getDocs(q);
+        const tests = [];
+        querySnapshot.forEach((doc) => {
+            tests.push({ id: doc.id, ...doc.data() });
+        });
+        return tests;
+    } catch (error) {
+        console.error("Error fetching antibody screening tests by patient ID:", error);
+        return [];
     }
 }

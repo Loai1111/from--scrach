@@ -116,12 +116,28 @@ function handleNavClick(e) {
     fetchAndDisplayData();
 }
 
-function handleTableClick(e) {
+async function handleTableClick(e) {
     const row = e.target.closest('tr');
     if (row && row.dataset.id) {
-        state.setState('selectedItemId', row.dataset.id);
-        ui.renderPage(); 
-        ui.renderDetailsPanel(); 
+        const patientId = row.dataset.id;
+        state.setState('selectedItemId', patientId);
+        ui.renderPage();
+
+        if (state.currentView === 'patients') {
+            const fullPatientData = await services.patient.getPatientById(patientId);
+            if (fullPatientData) {
+                const patientIndex = state.allPageData.findIndex(p => p.id === patientId);
+                if (patientIndex !== -1) {
+                    state.allPageData[patientIndex] = fullPatientData;
+                }
+                const filteredIndex = state.filteredPageData.findIndex(p => p.id === patientId);
+                if (filteredIndex !== -1) {
+                    state.filteredPageData[filteredIndex] = fullPatientData;
+                }
+            }
+        }
+        
+        ui.renderDetailsPanel();
     }
 }
 
@@ -441,7 +457,7 @@ async function handleFindMatch() {
         const patientProfileForMatching = {
             bloodGroup: patient.bloodGroup,
             rhFactor: patient.rhFactor,
-            antibody_history: patient.antibody_history || [],
+            antibodyHistory: patient.antibodyHistory || [],
         };
 
         const compatibleBags = findCompatibleBloodBags(patientProfileForMatching, inventory);
@@ -531,7 +547,7 @@ async function handlePatientBloodTestFormSubmit(e) {
     try {
         // Save the blood test results to the patient's record
         await services.patient.updatePatient(patient.id, {
-            antibody_history: bloodTestData.antibodies,
+            currentAntibodies: bloodTestData.antibodies,
             lastBloodTest: bloodTestData.testDate
         });
         
